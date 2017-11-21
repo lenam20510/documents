@@ -1,0 +1,83 @@
+## Vim
+# Delete text
+x	delete character at cursor
+dw	delete a word.
+d0	delete to the beginning of a line.
+d$	delete to the end of a line.
+d)	delete to the end of sentence.
+dgg	delete to the beginning of the file.
+dG	delete to the end of the file.
+dd	delete line
+3dd	delete three lines
+# Navigation keys
+h	moves the cursor one character to the left.
+j or Ctrl + J	moves the cursor down one line.
+k or Ctrl + P	moves the cursor up one line.
+l	moves the cursor one character to the right.
+0	moves the cursor to the beginning of the line.
+$	moves the cursor to the end of the line.
+^	moves the cursor to the first non-empty character of the line
+w	move forward one word (next alphanumeric word)
+W	move forward one word (delimited by a white space)
+e	move to end one word
+5w	move forward five words
+b	move backward one word (previous alphanumeric word)
+B	move backward one word (delimited by a white space)
+5b	move backward five words
+G	move to the end of the file
+gg	move to the beginning of the file.
+# Navigate around the document
+(	jumps to the previous sentence
+)	jumps to the next sentence
+{	jumps to the previous paragraph
+}	jumps to the next paragraph
+[[	jumps to the previous section
+]]	jumps to the next section
+[]	jump to the end of the previous section
+][	jump to the end of the next section
+# Undo/Redo operation
+u	undo the last operation.
+Ctrl+r	redo the last undo.
+# Search and Replace keys
+:vimgrep example %	Search in current file
+:vimgrep example /path/**
+	:cprev[ious]	[q	reverse through quickfix list
+	:cnext	]q	advance through quickfix list
+	:cfirst	[Q	go to start of quickfix list
+	:clast	]Q	go to end of quickfix list
+q:	"Open last command
+/search_text	search document for search_text going forward
+?search_text	search document for search_text going backward
+n	move to the next instance of the result from the search
+N	move to the previous instance of the result
+:%s/original/replacement	Search for the first occurrence of the string “original” and replace it with “replacement”
+:%s/original/replacement/g	Search and replace all occurrences of the string “original” with “replacement”
+
+Control + F 	moves the cursor forward to the next character on the line
+Control + B 	moves the cursor back to the previous character on the line
+##-------------------------------------------------------------
+## Terminal
+# Opening and closing tabs
+vim -p first.txt second.txt
+:tabnew           Open a new tab
+:tabedit {file}   edit specified file in a new tab
+:tabclose         close current tab
+:tabonly          close all other tabs (show only the current tab)
+" Navigation
+gt            go to next tab
+gT            go to previous tab
+:tabs         list all tabs including their displayed windows
+{i}gt         go to tab in position i
+# Working with multiple files
+:sp filename - Open a file in a new buffer and split window
+:vsp filename or :vs filename for a vertical split
+ctrl+ws - Split windows
+ctrl+ww - switch between windows
+ctrl+wq - Quit a window
+ctrl+wv - Split windows vertically
+## Ctags
+:ts or :tselect shows the list
+:tn or :tnext goes to the next tag in that list
+:tp or :tprev goes to the previous tag in that list
+:tf or :tfirst goes to the first tag of the list
+:tl or :tlast goes to the last tag of the list

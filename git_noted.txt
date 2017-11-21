@@ -1,0 +1,5 @@
+git config --global user.name "Le Nam"
+git config --global user.email namml@gcs-vn.com
+
+# git grep commands
+https://git-scm.com/docs/git-grep
