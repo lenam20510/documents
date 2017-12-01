@@ -49,7 +49,7 @@ function sgrep {
 			addLine=${exten}
 		fi
 	fi
-	includes+=" --exclude=*.bak"
+	includes+=" --exclude=*.bak --exclude=*.swp"
 	command="grep --color=auto ${addLine} -rna $includes $pattern $path"
 	echo $command
 	echo
@@ -110,20 +110,21 @@ alias ports='netstat -tulanp'
 alias diskspace="du -S | sort -n -r |more"
 
 # machine_type=mmlk # zsb2z
-Repository=IT6_Dev
-machine_type=a64_mv7040
+export REPO_NAME=IT6_Dev
+export MACHINE_TYPE=a64_mv7040
+
 alias 2portlan='cd ~/work/repository/IT5_42_2PortLan'
 alias work='cd /root/work'
 alias appsource='cd ~/work/KM3/KM/application'
-alias apprepo='cd ~/work/repository/${Repository}/KM/application'
+alias apprepo='cd ~/work/repository/${REPO_NAME}/KM/application'
 alias nvd_mfp='cd ~/work/KM3/KM/application/mfp/system/nvd'
 alias nvd_divlib='cd ~/work/KM3/KM/application/divlib/client/Proxy/system/nvd'
 alias zse3='cd ~/work/KM3/KM/work/zse3'
-alias errors='cat /root/work/KM3/KM/work/${machine_type}/log/errors.txt '
+alias errors='cat /root/work/KM3/KM/work/${MACHINE_TYPE}/log/errors.txt '
 alias build_mfp='~/work/buildmfp.sh'
 alias start_mount='~/work/start_mount.sh'
 alias end_mount='~/work/end_mount.sh'
-alias Repo='cd ~/work/repository/${Repository}/'
+alias Repo='cd ~/work/repository/${REPO_NAME}/'
 alias startMFP='cd /root; ./start-mfp.sh | tee -a ~/work/startMFP/log_start-mfp_`date +%F_%H%M%S`.txt'
 
 alias mkdir="mkdir -p"

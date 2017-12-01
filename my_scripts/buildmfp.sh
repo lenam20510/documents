@@ -8,11 +8,15 @@ action=act2
 # machine_type=zsb2z
 # machine_type=zse3
 # machine_type=mmlk
+repo_name=IT6_Dev
 machine_type=a64_mv7040
+[ -n ${REPO_NAME} ] && repo_name=${REPO_NAME}
+[ -n ${MACHINE_TYPE} ] && machine_type=${MACHINE_TYPE}
+
 WORK=/root/work
 KM3=$WORK/KM3
 KM=$KM3/KM
-REPO_2PORTLAN=$WORK/repository/IT5_42_1
+REPO_2PORTLAN=$WORK/repository/${repo_name}
 BUILD_SOURCE=$WORK/KM3/KM/application
 ORIGINAL_SOURCE=$WORK/original_source
 MASTER_BRANCH=master
@@ -48,12 +52,12 @@ function backupLogs {
 	if [ $? -ne 0 ]; then
 		return
 	fi
-	prefix=default
+	prefix=default-${start_time}
 	if [ -f $FILE_BRANCH ]; then
 		local branch=`cat $FILE_BRANCH`
 		[[ -n "$branch" ]] && prefix="$branch"
 	fi
-	backupLogFolder=$logFolder/backup_log-${start_time}-${prefix}
+	backupLogFolder=$logFolder/backup_log-${prefix}
 	mkdir -p $backupLogFolder
 	echo "Moving all logs to $backupLogFolder"
 	mv $logFolder/*.log $backupLogFolder
@@ -182,9 +186,11 @@ function extract_source {
 	# tree $new_folder
 	# Show tree new_folder
 	echo
-	echo '¥¥'${SIM_IPaddress}${des_folder} | sed  -e 's/¥//¥¥/g'
+	echo '\\'${SIM_IPaddress}${des_folder} | sed  -e 's/\//\\/g'
 	cd ${des_folder}
-	find ./new | sed -e "s/[^-][^¥/]*¥//  |/g" -e "s/|¥([^ ]¥)/|-¥1/"
+	find ./new | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"
+	
+	rm -f ${file_diff_name_only}; rm -f ${file_diff}
 
 	cd $cur_folder
 	echo "-----------------------------------------------------"
@@ -238,7 +244,7 @@ function startBuild {
 	# pmake_log=$logFolder/pmake-log.txt
 	cd $REPO_2PORTLAN
 	local branch=`git rev-parse --abbrev-ref HEAD`
-	echo ${branch}-${machine_type}-${action} > $FILE_BRANCH
+	echo ${start_time}-${branch}-${machine_type}-${action} > $FILE_BRANCH
 	cd $curr_dir
 	#start build
 	echo $KM/pmake
@@ -258,20 +264,21 @@ function startBuild {
 			let hours=deltatime/3600
 			let minutes=(deltatime/60)%60
 			let seconds=deltatime%60
-			printf "*************************%d:%02d:%02d***************************** ¥n" $hours $minutes $seconds
+			printf "*************************%d:%02d:%02d*****************************\n" $hours $minutes $seconds
 			# errors=`find $logFolder/*.log | xargs grep --color=auto "error:"`
 			errors=`egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}`
-			if [[ -n "$errors" ]]; then
-				echo "$errors"
-				echo "$errors" > $error_log &
-				echo
+			echo "$errors"
+			if [[ -n "$errors" && "$errors" == *"error:"* ]]; then
+				echo `grep -n -B5 -A5 --color=always "error:" ${build_log}` > $error_log &
 			fi
+			echo
 		fi
 		sleep 30
 	done
 	printf "Total build time ($machine_type): %d:%02d:%02d¥n" $hours $minutes $seconds
+	`egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}`
 	cd $curr_dir
-	return 0
+	exit 0
 }
 
 function startMFP {
@@ -314,20 +321,22 @@ else #Start build
 			machine_type=$1
 		elif [[ "$1" == "-notus" ]]; then
 			IS_UpdatedSource=
+			export logFolder=$KM/work/$machine_type/log
 		elif [[ "$1" == "-notbl" ]]; then
 			IS_BackupLog=
 		fi	
 		shift
 	done	
-	export logFolder=$KM/work/$machine_type/log
-	FILE_BRANCH=$logFolder/branch.txt
+	FILE_BRANCH=$logFolder/info_start_build.txt
 	echo action: $action
 	echo machine_type: $machine_type
 	echo 
-	
+	# checking buildmfp.sh was existed or not
+	check=`ps -ef | grep buildmfp.sh | grep -v grep`
+	[ $? -ne 0 ] && exit 0
 	[[ "$IS_BackupLog" == "True" ]] && backupLogs
 	[[ "$IS_UpdatedSource" == "True" ]] && updateSource
 	[[ "$IS_Build" == "True" ]] && startBuild
-	Exit 0
+	exit 0
 fi
 
