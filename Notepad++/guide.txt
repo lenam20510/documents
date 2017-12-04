@@ -1,0 +1,1 @@
+Copy Notepad++ folder to C:\Users\namml\AppData\Roaming

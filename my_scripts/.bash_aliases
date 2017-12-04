@@ -5,12 +5,22 @@
 #fi
 #
 #************export*************
+# machine_type=mmlk # zsb2z
+export REPO_NAME=IT6_Dev
+export MACHINE_TYPE=a64_mv7040
+export WORK=/root/work
+export KM3=$WORK/KM3
+export KM=$KM3/KM
+export BUILD_SOURCE=${KM}/application
+export REPO_2PORTLAN=$WORK/repository/${REPO_NAME}
+export logFolder=$KM/work/${MACHINE_TYPE}/log
+export MASTER_BRANCH=master
+export SIM_IPaddress='192.168.56.102'
+
 git config --global push.default current
 git config --global color.ui true
 #export GREP_OPTIONS='--color=always'
-    alias grep='grep --color=auto'
-    alias fgrep='fgrep --color=auto'
-    alias egrep='egrep --color=auto'
+
 export LS_OPTS='--color=auto'
 if [ ! -f ~/.vimrc ]; then
   echo 'syntax on' > ~/.vimrc
@@ -50,10 +60,34 @@ function sgrep {
 		fi
 	fi
 	includes+=" --exclude=*.bak --exclude=*.swp"
-	command="grep --color=auto ${addLine} -rna $includes $pattern $path"
-	echo $command
-	echo
-	$command
+	#command="grep --color=auto ${addLine} -rna $includes $pattern $path"
+	#echo $command
+	#echo
+	#$command
+	echo "grep --color=auto ${addLine} -rna $includes \"$pattern\" $path"
+	grep --color=auto ${addLine} -rna $includes "${pattern}" $path
+}
+function sfind {
+	path='.'
+	pattern=${1}
+	notInclude="-not -name *.swp \
+				-not -name *.swo \
+				-not -name *.swn "
+
+	if [ $# -gt 1 ]; then
+		path=$1
+		pattern=$2
+	fi
+	[[ "$pattern" != *"."* ]] && pattern=${pattern}*
+	find $path -type f -iname *${pattern} \
+		${notInclude} \
+		|  head | grep --color=auto '^\|[^/]*$' #color
+}
+function rmswapfile {
+	swapfile="-name *.swp \
+			-o -name *.swo \
+			-o -name *.swn "
+	rm -v `find ${BUILD_SOURCE} ${REPO_2PORTLAN} -type f ${swapfile}`
 }
 function fgtab {
   echo "tput setf/setb - Foreground/Background table"
@@ -65,12 +99,12 @@ function fgtab {
   done
 }
 
-function _git_pull_ {
+function git_pull {
 	local branch=`git rev-parse --abbrev-ref HEAD`
 	echo "git pull origin $branch"
 	git pull origin $branch
 }
-function _git_push_ {
+function git_push {
 	local branch=`git rev-parse --abbrev-ref HEAD`
 	echo "git push origin ${branch}:${branch}"
 	git push origin ${branch}:${branch}
@@ -109,38 +143,36 @@ alias ports='netstat -tulanp'
 # This is GOLD for finding out what is taking so much space on your drives!
 alias diskspace="du -S | sort -n -r |more"
 
-# machine_type=mmlk # zsb2z
-export REPO_NAME=IT6_Dev
-export MACHINE_TYPE=a64_mv7040
-
 alias 2portlan='cd ~/work/repository/IT5_42_2PortLan'
 alias work='cd /root/work'
 alias appsource='cd ~/work/KM3/KM/application'
 alias apprepo='cd ~/work/repository/${REPO_NAME}/KM/application'
 alias nvd_mfp='cd ~/work/KM3/KM/application/mfp/system/nvd'
 alias nvd_divlib='cd ~/work/KM3/KM/application/divlib/client/Proxy/system/nvd'
-alias zse3='cd ~/work/KM3/KM/work/zse3'
 alias errors='cat /root/work/KM3/KM/work/${MACHINE_TYPE}/log/errors.txt '
 alias build_mfp='~/work/buildmfp.sh'
 alias start_mount='~/work/start_mount.sh'
 alias end_mount='~/work/end_mount.sh'
-alias Repo='cd ~/work/repository/${REPO_NAME}/'
+alias repo='cd ~/work/repository/${REPO_NAME}/'
 alias startMFP='cd /root; ./start-mfp.sh | tee -a ~/work/startMFP/log_start-mfp_`date +%F_%H%M%S`.txt'
 
 alias mkdir="mkdir -p"
 alias lh='ls -lisAd .[^.]*'
 alias la='ls -lisA'
-alias fhere="find . -type f -name "
+alias grep='grep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias egrep='egrep --color=auto'
+
 alias hs='history|grep -i '
 alias pss='ps -axf | grep -v grep | grep -i $1'
+alias tree='find . -type d | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"'
 alias vi='vim'
 
 alias git_log="git log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
-alias git_pull="_git_pull_"
-alias git_push="_git_push_"
+#alias git_pull="_git_pull_"
+#alias git_push="_git_push_"
 alias git_tag="git tag -a"
 alias git_view_tag="git cat-file tag"
-alias tree='find . -type d | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"'
 #alias find_grep='find "$2"  -type f -name *.h -o -name *.cpp'
 #alias myalias='function __myalias() { echo "Hello $*, $1, $2"; myresult=$?; unset -f __myalias; return $myresult; }; __myalias'
 
@@ -176,7 +208,8 @@ FROWNY="${RED}:(${NORMAL}"
 
 
 #Support git PS1
-source /etc/bash_completion.d/git
+[ -f /etc/bash_completion.d/git ] && source /etc/bash_completion.d/git
+[ -f /etc/bash_completion.d/git-prompt ] && source /etc/bash_completion.d/git-prompt
 #PS1="[\[\033[32m\]\w]\[\033[0m\]\$(__git_ps1)\n\[\033[1;36m\]\u\[\033[32m\]$ \[\033[0m\]"
 # Throw it all together 
 #PS1="${RESET}${YELLOW}\h${NORMAL} \`${SELECT}\` ${YELLOW}>${NORMAL} "
