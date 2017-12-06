@@ -8,27 +8,10 @@ action=act2
 # machine_type=zsb2z
 # machine_type=zse3
 # machine_type=mmlk
-repo_name=IT6_Dev
-machine_type=a64_mv7040
-[ -n ${REPO_NAME} ] && repo_name=${REPO_NAME}
-[ -n ${MACHINE_TYPE} ] && machine_type=${MACHINE_TYPE}
-
-WORK=/root/work
-KM3=$WORK/KM3
-KM=$KM3/KM
-REPO_2PORTLAN=$WORK/repository/${repo_name}
-BUILD_SOURCE=$WORK/KM3/KM/application
-ORIGINAL_SOURCE=$WORK/original_source
-MASTER_BRANCH=master
-SIM_IPaddress='192.168.56.102'
-export logFolder=$KM/work/$machine_type/log
-
-
-FILE_CHANGES=(	APIC_Setting_MailSendSetting.h NVDC_Setting_MailSendSetting.h
-				NVDC_NetworkSetting.cpp stub_APIC_Setting.cpp
-				APIC_Setting_common.h NVDC_ClassDefineTbl.h
-				NVDC_Setting_CopyScanJobSetting.h)
-FILE_NOT_UPDATE=( NVDC_DebugAPI.h NVDC_DebugAPI.cpp )
+# repo_name=${REPO_NAME}
+# machine_type=${MACHINE_TYPE}
+# [ -n ${REPO_NAME} ] && repo_name=${REPO_NAME}
+# [ -n ${MACHINE_TYPE} ] && machine_type=${MACHINE_TYPE}
 
 function Help() {
 	echo "     Copy buildmfp.sh to /root/work folder"
@@ -238,19 +221,18 @@ function updateSource {
 }
 
 function startBuild {
-	echo "Build starting..."
+	echo "-->Build starting..."
 	curr_dir=`pwd`
 	build_log=$logFolder/build-log-$start_time.txt
 	# pmake_log=$logFolder/pmake-log.txt
 	cd $REPO_2PORTLAN
 	local branch=`git rev-parse --abbrev-ref HEAD`
-	echo ${start_time}-${branch}-${machine_type}-${action} > $FILE_BRANCH
+	echo ${start_time}-${branch}-${MACHINE_TYPE}-${action} > $FILE_BRANCH
 	cd $curr_dir
 	#start build
-	echo $KM/pmake
 	cd $KM/pmake
-	echo "./pmake.sh $machine_type $action q530 e s n 4"
-	$(./pmake.sh $machine_type $action q530 e s n 4 | tee -a $build_log) &
+	echo "./pmake.sh $MACHINE_TYPE $action q530 e s n 4"
+	$(./pmake.sh $MACHINE_TYPE $action q530 e s n 4 | tee -a $build_log) &
 	sleep 5
 	loop=true
 	error_log=$logFolder/errors.txt
@@ -269,23 +251,31 @@ function startBuild {
 			errors=`egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}`
 			echo "$errors"
 			if [[ -n "$errors" && "$errors" == *"error:"* ]]; then
-				echo `grep -n -B5 -A5 --color=always "error:" ${build_log}` > $error_log &
+				echo "`grep -n -B5 -A5 --color=always "error:" ${build_log}`" > $error_log &
 			fi
 			echo
 		fi
 		sleep 30
 	done
-	printf "Total build time ($machine_type): %d:%02d:%02d¥n" $hours $minutes $seconds
+	printf "Total build time ($MACHINE_TYPE): %d:%02d:%02d¥n" $hours $minutes $seconds
 	`egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}`
 	cd $curr_dir
 	exit 0
 }
 
 function startMFP {
-	cd ‾
-	log_MFP=‾/work/startMFP
-	mkdir -p $log_MFP
-	./start-mfp.sh | tee -a $log_MFP/log_start-mfp_${start_time}.txt
+	local log_fld=~/work/startMFP
+	mkdir -p ${log_fld}
+	mkdir -p ${log_fld}/old
+	mv ${log_fld}/*.txt ${log_fld}/old
+	local log_file=${log_fld}/log_start-mfp_${start_time}.txt
+	
+	export MYALIASE=F ; source ~/.bashrc
+	cd /root
+	./start-mfp.sh | tee -a ${log_file}
+	
+	# export MYALIASE=TRUE ; source ~/.bashrc
+	# cd ${curr_fld}
 	return
 }
 
@@ -299,18 +289,14 @@ if [[ "$1" == "-h" ]]; then
 elif [[ "$1" == "-r" ]]; then
 	if [[ -n "${*:2}" ]]; then
 		report "$2" "$3"
-	# else
-		# report "${FILE_CHANGES[*]}"
 	fi
 	
 elif [[ "$1" == "-us" ]]; then
 	updateSource
 elif [[ "$1" == "-es" ]]; then
 	extract_source $2 $3
-# elif [[ "$1" == "-sip" ]]; then
-	# findSipPattern
-# elif [[ "$1" == "-smfp" ]]; then
-	# startMFP 	
+elif [[ "$1" == "-smfp" ]]; then
+	startMFP
 else #Start build
 	while [[ -n "$1" ]]; do
 		if [[ "$1" == "-a" ]]; then
@@ -318,10 +304,10 @@ else #Start build
 			action=$1
 		elif [[ "$1" == "-m" ]]; then
 			shift
-			machine_type=$1
+			export MACHINE_TYPE=$1
 		elif [[ "$1" == "-notus" ]]; then
 			IS_UpdatedSource=
-			export logFolder=$KM/work/$machine_type/log
+			export logFolder=$KM/work/$MACHINE_TYPE/log
 		elif [[ "$1" == "-notbl" ]]; then
 			IS_BackupLog=
 		fi	
@@ -329,7 +315,7 @@ else #Start build
 	done	
 	FILE_BRANCH=$logFolder/info_start_build.txt
 	echo action: $action
-	echo machine_type: $machine_type
+	echo machine_type: $MACHINE_TYPE
 	echo 
 	# checking buildmfp.sh was existed or not
 	check=`ps -ef | grep buildmfp.sh | grep -v grep`

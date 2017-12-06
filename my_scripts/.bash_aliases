@@ -46,7 +46,7 @@ function sgrep {
 	path="$2"
 	exten="$3"
 	addLine="${*:4}"
-	includes="--include=*.h --include=*.cpp --include=*.c"
+	includes="--include=*.h --include=*.cpp --include=*.c --include=MediaMapFile*"
 	if [[ -z "$path" ]]; then
 		path="."
 	fi
@@ -54,7 +54,7 @@ function sgrep {
 		if [[ "$exten" == "h" || "$exten" == "cpp" || "$exten" == "c" ]]; then
 			includes="--include=*.${exten}"
 		elif [[ "$exten" != "-"* ]]; then
-			includes="--include=${exten}*"
+			includes="--include=*${exten}*"
 		else
 			addLine=${exten}
 		fi
