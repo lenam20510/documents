@@ -4,7 +4,9 @@ start=`date +%s`
 start_time=`date +%F_%H%M%S`
 #Default value:
 objects=$@
-action=act2
+CURR_FOLDER=`pwd`
+EXTEN_FILES='-name *.h -o -name *.cpp -o -name Makefile -o -name MediaMapFile*'
+# action=act2
 # machine_type=zsb2z
 # machine_type=zse3
 # machine_type=mmlk
@@ -45,46 +47,6 @@ function backupLogs {
 	echo "Moving all logs to $backupLogFolder"
 	mv $logFolder/*.log $backupLogFolder
 	mv $logFolder/*.txt $backupLogFolder
-}
-
-function removeObjects {
-	echo "Removing objects: $objects ..."
-	for ob_find in ${objects[*]}
-	do
-		obs=`find $KM/* -name  "$ob_find.o"`
-		for ob in ${obs[*]} 
-		do
-			echo $ob
-			rm -f $ob
-		done
-	done
-} 
-
-function report {
-	# parameters=$@
-	listFile=$WORK/filelist.txt
-	target=$WORK/report
-	if [[ -n "$@" ]]; then
-		old_source=$WORK/$1
-		repo_source=$WORK/$2
-	else
-		old_source=$WORK/original_source/KM3/KM/application
-		repo_source=$WORK/repository/2PortLan
-	fi
-	rm -rf $WORK/report/*
-	report_new_dir=$target/new
-	report_old_dir=$target/old
-	mkdir -p $report_new_dir
-	mkdir -p $report_old_dir
-	curr_dir=`pwd`
-	for file in `cat $listFile`
-	do
-		cd $repo_source
-		cp $file --parents $report_new_dir/
-		cd $old_source
-		cp $file --parents $report_old_dir/
-	done
-	cd $curr_dir
 }
 
 function extract_source {
@@ -172,7 +134,8 @@ function extract_source {
 	echo '\\'${SIM_IPaddress}${des_folder} | sed  -e 's/\//\\/g'
 	cd ${des_folder}
 	find ./new | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"
-	
+	addedLine=`diff -r old new | grep "> " | wc -l`
+	echo "Modified line number: ${addedLine}"
 	rm -f ${file_diff_name_only}; rm -f ${file_diff}
 
 	cd $cur_folder
@@ -202,7 +165,7 @@ function updateSource {
 	
 	for path in ${arr_upSource[*]}
 	do
-		files=`find $path/* -type f -name "*.h" -o -name "*.cpp" -o -name "Makefile" -o -name "MediaMapFile*"`
+		files=`find $path/* -type f ${EXTEN_FILES}`
 		for file in ${files[*]}
 		do
 			file_name=$(basename "${file}")
@@ -220,22 +183,51 @@ function updateSource {
 	cd $curr_dir
 }
 
+function compareFolder {
+	local first_fld=`echo $(cd ${1}; pwd; cd $CURR_FOLDER)`
+	local second_fld=`echo $(cd ${2}; pwd; cd $CURR_FOLDER)`
+	first_fld_name=`echo $first_fld | sed  -e 's/\///g'`
+	second_fld_name=`echo $second_fld | sed  -e 's/\///g'`
+	local cmpFld=${WORK}/compareFolder/${first_fld_name}-${second_fld_name}-${start_time}
+	local cmpFld_first=${cmpFld}/${first_fld_name}
+	local cmpFld_second=${cmpFld}/${second_fld_name}
+	mkdir -p ${cmpFld_first}; mkdir -p ${cmpFld_second}
+	local fileUpdateSource=${cmpFld}/fileUpdateSource-${start_time}.txt
+	
+	# diff all files
+	`diff --brief --recursive --no-dereference --new-file --no-ignore-file-name-case ${first_fld} ${second_fld} > ${fileUpdateSource}`
+	echo "*********************************different************************************" | tee -a ${fileUpdateSource}
+	cd ${first_fld}
+	files=`find * -type f ${EXTEN_FILES}`
+	for file in ${files[*]}
+	do
+		file_2nd=${second_fld}/$file
+		`cmp --silent $file $file_2nd`
+		if [ $? -ne 0 ]; then
+			echo $file $file_2nd | tee -a $fileUpdateSource
+			cp --parents ${file} ${cmpFld_first}
+			cp --parents ${file_2nd} ${cmpFld_second}
+		fi
+	done
+	mv ${cmpFld_second}/${second_fld}/* ${cmpFld_second}
+	rm -r ${cmpFld_second}/$(echo "$second_fld" | cut -d "/" -f2)
+}
+
 function startBuild {
 	echo "-->Build starting..."
 	curr_dir=`pwd`
 	build_log=$logFolder/build-log-$start_time.txt
-	# pmake_log=$logFolder/pmake-log.txt
+	error_log=$logFolder/errors.txt
 	cd $REPO_2PORTLAN
 	local branch=`git rev-parse --abbrev-ref HEAD`
-	echo ${start_time}-${branch}-${MACHINE_TYPE}-${action} > $FILE_BRANCH
+	echo ${start_time}-${branch}-${MACHINE_TYPE}-${ACTION} > $FILE_BRANCH
 	cd $curr_dir
 	#start build
 	cd $KM/pmake
-	echo "./pmake.sh $MACHINE_TYPE $action q530 e s n 4"
-	$(./pmake.sh $MACHINE_TYPE $action q530 e s n 4 | tee -a $build_log) &
+	echo "./pmake.sh $MACHINE_TYPE ${ACTION} ${QT_VERSION} e s n 4"
+	$(./pmake.sh $MACHINE_TYPE ${ACTION} ${QT_VERSION} e s n 4 | tee -a $build_log) &
 	sleep 5
 	loop=true
-	error_log=$logFolder/errors.txt
 	while [[ -n "$loop" ]]; do
 		id=`ps -ef | grep -v "grep" | grep ./pmake.sh`
 		if [ $? -ne 0 ]; then
@@ -286,35 +278,35 @@ IS_Build=True
 if [[ "$1" == "-h" ]]; then
 	Help
 	exit 0
-elif [[ "$1" == "-r" ]]; then
-	if [[ -n "${*:2}" ]]; then
-		report "$2" "$3"
-	fi
-	
+elif [[ "$1" == "-bl" ]]; then
+	backupLogs
 elif [[ "$1" == "-us" ]]; then
 	updateSource
 elif [[ "$1" == "-es" ]]; then
 	extract_source $2 $3
+elif [[ "$1" == "-cmp" ]]; then
+	[[ -z $2 || -z $3 ]] && exit 
+	compareFolder $2 $3 $4
 elif [[ "$1" == "-smfp" ]]; then
 	startMFP
 else #Start build
 	while [[ -n "$1" ]]; do
 		if [[ "$1" == "-a" ]]; then
 			shift
-			action=$1
+			export ACTION=$1
 		elif [[ "$1" == "-m" ]]; then
 			shift
 			export MACHINE_TYPE=$1
+			export logFolder=$KM/work/$MACHINE_TYPE/log
 		elif [[ "$1" == "-notus" ]]; then
 			IS_UpdatedSource=
-			export logFolder=$KM/work/$MACHINE_TYPE/log
 		elif [[ "$1" == "-notbl" ]]; then
 			IS_BackupLog=
 		fi	
 		shift
 	done	
 	FILE_BRANCH=$logFolder/info_start_build.txt
-	echo action: $action
+	echo action: $ACTION
 	echo machine_type: $MACHINE_TYPE
 	echo 
 	# checking buildmfp.sh was existed or not

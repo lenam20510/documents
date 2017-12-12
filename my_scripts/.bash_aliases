@@ -8,6 +8,8 @@
 # machine_type=mmlk # zsb2z
 export REPO_NAME=IT6_Dev
 export MACHINE_TYPE=a64_mv7040
+export ACTION=act2
+export QT_VERSION=q530
 export WORK=/root/work
 export KM3=$WORK/KM3
 export KM=$KM3/KM

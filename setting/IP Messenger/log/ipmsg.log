@@ -1907,3 +1907,294 @@ Sơn sẽ tạo các shortcut sau, và cũng sẽ nhờ các bạn translator ch
 \\192.168.106.167\05_Input\05_Module\01_CommonAPI(nvd_sys)\05_HIENG_Feedback\Document_20171205_3
 
 
+=====================================
+ To: Son (CommonAPI/PHUONG3311/192.168.106.7/isadmin-<7e7049785a52da11>)
+ To: huypl (CommonAPI/PHUONG3316/192.168.106.13/huypl-<e1dad94d79e3cb95>)
+  at Thu Dec 07 13:44:05 2017 (multi)(RSA2/Signed+)(sealed)
+-------------------------------------
+To: a.Son
+CC: a.Huy
+
+Task Eagle No.103
+http://192.168.106.250/issues/610#note-4
+
+=====================================
+ To: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+  at Thu Dec 07 13:44:19 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+cafe ko anh
+
+=====================================
+ From: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+  at Thu Dec 07 13:44:30 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+Go
+
+>cafe ko anh
+
+
+=====================================
+ From: huypl (CommonAPI/PHUONG3316/192.168.106.13/huypl-<e1dad94d79e3cb95>)
+   Cc: Longvp (CommonAPI/PHUONG3313/192.168.106.4/Longvp-<ba4457d9603fe96e>)
+   Cc: Phat Dang (CommonAPI/PHUONG3314/192.168.106.5/Ky Phong-<8f84e71d68d0b3fa>)
+   Cc: Son (CommonAPI/PHUONG3311/192.168.106.7/isadmin-<7e7049785a52da11>)
+   Cc: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+   Cc: thuongxh (CommonAPI/PHUONG3447/192.168.106.15/thuongxh-<0045f87b3cdcda17>)
+  at Thu Dec 07 16:38:25 2017 (multi)(RSA2/Signed+)(sealed)
+  (image) ipmsgclip_r_1512639505_138.png
+-------------------------------------
+Hi ae,
+
+Hom nay minh se deliver nhung muc sau sang HIENG.
+Anh/em tao deliver cua minh; update tren redmine; inform aSon va cc: Huy nha. 
+
+ 
+
+Note: Lien quan den muc 'Report', anh em su dung template sau 
+\\192.168.106.167\07_Personal\00_common\00_CommonAPI\05_Report_Template\01_Manual
+
+
+
+=====================================
+ From: Son (CommonAPI/PHUONG3311/192.168.106.7/isadmin-<7e7049785a52da11>)
+   Cc: Longvp (CommonAPI/PHUONG3313/192.168.106.4/Longvp-<ba4457d9603fe96e>)
+   Cc: Phat Dang (CommonAPI/PHUONG3314/192.168.106.5/Ky Phong-<8f84e71d68d0b3fa>)
+   Cc: huypl (CommonAPI/PHUONG3316/192.168.106.13/huypl-<e1dad94d79e3cb95>)
+   Cc: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+   Cc: thuongxh (CommonAPI/PHUONG3447/192.168.106.15/thuongxh-<0045f87b3cdcda17>)
+  at Thu Dec 07 17:07:26 2017 (multi)(RSA2/Signed+)(sealed)
+-------------------------------------
+Hi All,
+Ông Tateshita vừa kêu chỉnh lại format file report.
+Nội dung chỉnh sửa chỉ là dồn 3 sheet vào 1 sheet thôi.
+Nên ai dùng template cũ thì chỉ cần copy nội dung các sheet riêng rẻ vào 1 sheet của template mới là được.
+
+Template Version 2:
+\\192.168.106.167\07_Personal\00_common\00_CommonAPI\05_Report_Template\01_Manual
+File: CommonAPI_Task_End_Report_V2.xlsx
+
+>Hi ae,
+>
+>Hom nay minh se deliver nhung muc sau sang HIENG.
+>Anh/em tao deliver cua minh; update tren redmine; inform aSon va cc: Huy nha. 
+>
+>  
+>
+>Note: 
+Lien quan den muc 'Report', anh em su dung template sau 
+>\\192.168.106.167\07_Personal\00_common\00_CommonAPI\05_Report_Template\01_Manual
+
+
+=====================================
+ From: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+  at Thu Dec 07 17:18:03 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+Anh bổ sung thêm xíu.
+>Để phục vụ cho việc đến số dòng code thêm/bớt  trong file report, anh gửi shell script bên dưới.
+>
+>\\192.168.106.167\07_Personal\sonmt\Work\Tool
+>File: count_diff.sh
+>
+>Usage: 
+>Copy file script này và source code "old", "new" vào máy ảo rồi chạy command như sau:
+>
+>cd <path to count_diff.sh>
+>./count_diff.sh <Path to "old" folder> <Path to "new" folder>
+
+
+=====================================
+ To: Son (CommonAPI/PHUONG3311/192.168.106.7/isadmin-<7e7049785a52da11>)
+ To: huypl (CommonAPI/PHUONG3316/192.168.106.13/huypl-<e1dad94d79e3cb95>)
+  at Thu Dec 07 17:26:47 2017 (multi)(RSA2/Signed+)(sealed)
+-------------------------------------
+To: a.Son
+CC: a.Huy
+Task Eagle No.103
+http://192.168.106.250/issues/604#note-7
+
+=====================================
+ From: Son (CommonAPI/PHUONG3311/192.168.106.7/isadmin-<7e7049785a52da11>)
+   Cc: Longvp (CommonAPI/PHUONG3313/192.168.106.4/Longvp-<ba4457d9603fe96e>)
+   Cc: Phat Dang (CommonAPI/PHUONG3314/192.168.106.5/Ky Phong-<8f84e71d68d0b3fa>)
+   Cc: huypl (CommonAPI/PHUONG3316/192.168.106.13/huypl-<e1dad94d79e3cb95>)
+   Cc: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+   Cc: thuongxh (CommonAPI/PHUONG3447/192.168.106.15/thuongxh-<0045f87b3cdcda17>)
+  at Thu Dec 07 17:45:14 2017 (multi)(RSA2/Signed+)(sealed)
+-------------------------------------
+Hi All,
+
+Dưới đây là file task tracking được update trực tiếp với phía khách hàng.
+Có gì mọi người cũng tham khảo nhé.
+
+\\192.168.106.167\07_Personal\00_common\00_CommonAPI\Task_Status
+File: TaskTracking.xlsx
+
+
+
+=====================================
+ To: Phat Dang (CommonAPI/PHUONG3314/192.168.106.5/Ky Phong-<8f84e71d68d0b3fa>)
+  at Thu Dec 07 18:06:33 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+>\\192.168.106.167\07_Personal\sonmt\Work\Tool
+>File: count_diff.sh
+
+
+=====================================
+ To: Son (CommonAPI/PHUONG3311/192.168.106.7/isadmin-<7e7049785a52da11>)
+ To: huypl (CommonAPI/PHUONG3316/192.168.106.13/huypl-<e1dad94d79e3cb95>)
+  at Mon Dec 11 12:00:49 2017 (multi)(RSA2/Signed+)(sealed)
+-------------------------------------
+TO: a.Son
+CC: a.Huy 
+
+http://192.168.106.250/issues/743#note-1
+
+=====================================
+ To: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+  at Mon Dec 11 13:32:40 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+repository of IT6_Dev anh fetch ve dc ko 
+
+=====================================
+ From: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+  at Mon Dec 11 13:33:22 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+duoc
+
+=====================================
+ To: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+  at Mon Dec 11 13:33:39 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+192.168.106.101
+IP nay ha
+
+>duoc
+
+
+=====================================
+ From: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+  at Mon Dec 11 13:34:15 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+yes
+
+>192.168.106.101
+>IP nay ha
+
+
+=====================================
+ To: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+  at Mon Dec 11 13:52:00 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+do cai thang Symantec chet tiec :((
+
+>yes
+
+
+=====================================
+ From: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+  at Mon Dec 11 13:52:20 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+:( block lai ha
+
+>do cai thang Symantec chet tiec :((
+
+
+=====================================
+ To: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+  at Mon Dec 11 13:52:45 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+uhm no block lai
+
+>:( block lai ha
+
+
+=====================================
+ From: Son (CommonAPI/PHUONG3311/192.168.106.7/isadmin-<7e7049785a52da11>)
+   Cc: huypl (CommonAPI/PHUONG3316/192.168.106.13/huypl-<e1dad94d79e3cb95>)
+  at Mon Dec 11 17:47:00 2017 (multi)(RSA2/Signed+)(sealed)
+-------------------------------------
+To: Nam,
+CC: Huy,
+Please update % done for child tickets.
+http://192.168.106.250/issues/604
+
+
+=====================================
+ From: phuonghn (PHUONG3322/192.168.106.252/phuonghn-<ef8004238a35b895>)
+   Cc: Longvp (CommonAPI/PHUONG3313/192.168.106.4/Longvp-<ba4457d9603fe96e>)
+   Cc: Phat Dang (CommonAPI/PHUONG3314/192.168.106.5/Ky Phong-<8f84e71d68d0b3fa>)
+   Cc: Son (CommonAPI/PHUONG3311/192.168.106.7/isadmin-<7e7049785a52da11>)
+   Cc: huypl (CommonAPI/PHUONG3316/192.168.106.13/huypl-<e1dad94d79e3cb95>)
+   Cc: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+   Cc: thuongxh (CommonAPI/PHUONG3447/192.168.106.15/thuongxh-<0045f87b3cdcda17>)
+  at Mon Dec 11 18:42:55 2017 (multi)(RSA2/Signed+)(sealed)
+-------------------------------------
+Ae update latest status len redmine nha.
+Toi nay anh review de lam report luon.
+Mai anh Son nghi, anh dinh di kham benh co the vo tre
+
+
+
+=====================================
+ To: huypl (CommonAPI/PHUONG3316/192.168.106.13/huypl-<e1dad94d79e3cb95>)
+  at Tue Dec 12 10:47:00 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+\\192.168.106.167\06_Output\05_Development\32_HDD_Backup\03_Doc
+HDD_Data_Backup_CommonAPI_Investigate_V02.xlsx
+
+=====================================
+ From: huypl (CommonAPI/PHUONG3316/192.168.106.13/huypl-<e1dad94d79e3cb95>)
+   Cc: Longvp (CommonAPI/PHUONG3313/192.168.106.4/Longvp-<ba4457d9603fe96e>)
+   Cc: Phat Dang (CommonAPI/PHUONG3314/192.168.106.5/Ky Phong-<8f84e71d68d0b3fa>)
+   Cc: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+   Cc: thuongxh (CommonAPI/PHUONG3447/192.168.106.15/thuongxh-<0045f87b3cdcda17>)
+  at Tue Dec 12 14:34:56 2017 (multi)(RSA2/Signed+)(sealed)
+  (image) ipmsgclip_r_1513064096_94.png
+-------------------------------------
+a/e check lai nhung issue sau va update status cho nhung task; due date truoc 12/12/2017. 
+
+
+
+ 
+
+
+=====================================
+ From: huypl (CommonAPI/PHUONG3316/192.168.106.13/huypl-<e1dad94d79e3cb95>)
+   Cc: Longvp (CommonAPI/PHUONG3313/192.168.106.4/Longvp-<ba4457d9603fe96e>)
+   Cc: Phat Dang (CommonAPI/PHUONG3314/192.168.106.5/Ky Phong-<8f84e71d68d0b3fa>)
+   Cc: nhannt (CommonAPI/PHUONG3445/192.168.106.18/nhannt-<ba79690cb1c0cdda>)
+   Cc: thuongxh (CommonAPI/PHUONG3447/192.168.106.15/thuongxh-<0045f87b3cdcda17>)
+  at Tue Dec 12 14:52:12 2017 (multi)(RSA2/Signed+)(sealed)
+  (image) ipmsgclip_r_1513065132_37.png
+-------------------------------------
+Long update status cua 2 task sau. 
+
+ 
+
+
+>a/e check lai nhung issue sau va update status cho nhung task; due date truoc 12/12/2017. 
+>
+>
+>
+> 
+
+
+=====================================
+ From: phuonghn (PHUONG3322/192.168.106.252/phuonghn-<ef8004238a35b895>)
+  at Tue Dec 12 15:03:58 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+http://192.168.106.250/issues/743
+Task ko co Due Date, Estimation, %, status.
+Research thi chon BI nha Nam
+
+=====================================
+ To: phuonghn (PHUONG3322/192.168.106.252/phuonghn-<ef8004238a35b895>)
+  at Tue Dec 12 15:06:17 2017 (RSA2/Signed+)(sealed)
+-------------------------------------
+Ok anh, updated
+
+>http://192.168.106.250/issues/743
+>Task ko co Due Date, Estimation, %, status.
+>Research thi chon BI nha Nam
+
+
