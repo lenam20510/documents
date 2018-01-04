@@ -4,7 +4,7 @@ start=`date +%s`
 start_time=`date +%F_%H%M%S`
 #Default value:
 objects=$@
-CURR_FOLDER=`pwd`
+CURR_DIR=`pwd`
 EXTEN_FILES='-name *.h -o -name *.cpp -o -name Makefile -o -name MediaMapFile*'
 # action=act2
 # machine_type=zsb2z
@@ -19,9 +19,9 @@ function Help() {
 	echo "     Copy buildmfp.sh to /root/work folder"
 	echo "        Usage:"
 	echo "              1) ./buildmfp.sh -us"
-	echo "               	Update source code from repository [${REPO_2PORTLAN}] to [${BUILD_SOURCE}]"
+	echo "               	Update source code from repository [${REPO_PATH}] to [${BUILD_SOURCE}]"
 	echo "              2) ./buildmfp.sh -es [First commit] [End commit]"
-	echo "               	Create two new & old folder from repository [${REPO_2PORTLAN}]"
+	echo "               	Create two new & old folder from repository [${REPO_PATH}]"
 	echo "              3) ./buildmfp.sh [Option]"
 	echo "              [Option] :"
 	echo "                      -a      :   action build (act2, divact2, mfpact2, ...). default: act2"
@@ -55,8 +55,7 @@ function extract_source {
 	revision_end=$2
 	# Set the latest revision
 	source_OPA=
-	cur_folder=`pwd`
-	cd $REPO_2PORTLAN
+	cd ${REPO_PATH}
 	local branch=`git rev-parse --abbrev-ref HEAD`
 	
 	#revision_end=""
@@ -68,7 +67,13 @@ function extract_source {
 			# get first commit of a branch
 			# first_commit_branch=$(git rev-list ^${MASTER_BRANCH} ${branch} | tail -n 1)
 			# get previous commit before the first commit of this branch.
-			previous_commit=$(echo ${rev_list_branch} | cut -c$((${#rev_list_master_branch}+1))- | awk '{print $2;}')
+			previous_commit=$(echo ${rev_list_branch} | cut -c$((${#rev_list_master_branch}+1))-)
+			count=$(echo "$previous_commit" | wc -w)
+			if [ $count -lt 2 ]; then
+				previous_commit=$(echo $previous_commit | xargs )
+			else
+				previous_commit=$(echo $previous_commit | awk '{print $2;}' | xargs)
+			fi
 			revision_begin=${previous_commit}
 		else
 			revision_begin=`git rev-list ${branch} | tail -n1`
@@ -83,7 +88,7 @@ function extract_source {
 	echo revision_end=$revision_end
 	
 	echo "------------------- $revision_begin:$revision_end ------------------------"
-	cd $cur_folder
+	cd $CURR_DIR
 	des_folder=${WORK}"/extract_source/`date +%F_%H%M%S`_${branch}_${revision_begin}_${revision_end}"
 	mkdir -p $des_folder
 	rm -rf $des_folder/*
@@ -101,7 +106,7 @@ function extract_source {
 	# This is one-line command to get list file from "revision_begin" to "revision_end".
 	# And, perform copying changed files to new location by keep folder structure same as source file.
 	# git diff 06a3af6 8174c67 --name-only
-	cd $REPO_2PORTLAN
+	cd ${REPO_PATH}
 	git diff $revision_begin $revision_end > $file_diff
 	git diff $revision_begin $revision_end --name-only > $file_diff_name_only
 	# git diff $revision_begin $revision_end --name-only | 
@@ -123,7 +128,7 @@ function extract_source {
 		else
 			cp $line $new_folder/$line
 		fi
-		# cp --parents $REPO_2PORTLAN/$line $new_folder
+		# cp --parents ${REPO_PATH}/$line $new_folder
 		# cp --parents $ORIGINAL_SOURCE/KM3/KM/application/$line $old_folder
 	done < "$file_diff_name_only"
 
@@ -138,7 +143,7 @@ function extract_source {
 	echo "Modified line number: ${addedLine}"
 	rm -f ${file_diff_name_only}; rm -f ${file_diff}
 
-	cd $cur_folder
+	cd $CURR_DIR
 	echo "-----------------------------------------------------"
 }
 
@@ -150,11 +155,10 @@ function updateSource {
 	# arr_upSource=(mfp divlib/client/Proxy divlib/server)
 	arr_upSource=(mfp divlib/client/Proxy/system/ divlib/client/Proxy/nicfum divlib/server/Stub)
 	# arr_upSource=(mfp divlib)
-	curr_dir=`pwd`
 	ops_find='-name "*.h" -o  -name "*.cpp" -o -name Makefile'
 	touch ${fileUpdateSource}
 	echo fileUpdateSource:$fileUpdateSource
-	cd $REPO_2PORTLAN
+	cd ${REPO_PATH}
 	
 	subflds=`ls . -1 | grep -vE "/usr|^$"`
 	if [[ "$subflds" == *"KM"* ]]; then
@@ -180,12 +184,12 @@ function updateSource {
 			fi
 		done
 	done
-	cd $curr_dir
+	cd $CURR_DIR
 }
 
 function compareFolder {
-	local first_fld=`echo $(cd ${1}; pwd; cd $CURR_FOLDER)`
-	local second_fld=`echo $(cd ${2}; pwd; cd $CURR_FOLDER)`
+	local first_fld=`echo $(cd ${1}; pwd; cd $CURR_DIR)`
+	local second_fld=`echo $(cd ${2}; pwd; cd $CURR_DIR)`
 	first_fld_name=`echo $first_fld | sed  -e 's/\///g'`
 	second_fld_name=`echo $second_fld | sed  -e 's/\///g'`
 	local cmpFld=${WORK}/compareFolder/${first_fld_name}-${second_fld_name}-${start_time}
@@ -215,13 +219,12 @@ function compareFolder {
 
 function startBuild {
 	echo "-->Build starting..."
-	curr_dir=`pwd`
 	build_log=$logFolder/build-log-$start_time.txt
 	error_log=$logFolder/errors.txt
-	cd $REPO_2PORTLAN
+	cd ${REPO_PATH}
 	local branch=`git rev-parse --abbrev-ref HEAD`
 	echo ${start_time}-${branch}-${MACHINE_TYPE}-${ACTION} > $FILE_BRANCH
-	cd $curr_dir
+	cd $CURR_DIR
 	#start build
 	cd $KM/pmake
 	echo "./pmake.sh $MACHINE_TYPE ${ACTION} ${QT_VERSION} e s n 4"
@@ -249,9 +252,9 @@ function startBuild {
 		fi
 		sleep 30
 	done
-	printf "Total build time ($MACHINE_TYPE): %d:%02d:%02d¥n" $hours $minutes $seconds
+	printf "Total build time ($MACHINE_TYPE): %d:%02d:%02d\n" $hours $minutes $seconds
 	`egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}`
-	cd $curr_dir
+	cd $CURR_DIR
 	exit 0
 }
 

@@ -48,3 +48,5 @@ In the terminal setup: Kanji (receive) = SJIS ; Kanji (transmit) = SJIS; locale 
 In ~/.vimrc : set encoding=sjis
 "Install plugin
 rpm -Uvh ~/.vim/ctags-5.5.4-1.i386.rpm
+dpkg -i ~/.vim/exuberant-ctags_5.9_svn20110310-11_i386.deb
+https://pkgs.org/download/ctags

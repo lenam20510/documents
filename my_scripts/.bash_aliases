@@ -6,15 +6,15 @@
 #
 #************export*************
 # machine_type=mmlk # zsb2z
-export REPO_NAME=IT6_Dev
-export MACHINE_TYPE=a64_mv7040
-export ACTION=act2
-export QT_VERSION=q530
 export WORK=/root/work
 export KM3=$WORK/KM3
 export KM=$KM3/KM
+export REPO_NAME=IT5_42_ZeusS_ZX0_SIM
+export REPO_PATH=$WORK/git/${REPO_NAME}
+export MACHINE_TYPE=zse3
+export ACTION=act2
+export QT_VERSION=q530
 export BUILD_SOURCE=${KM}/application
-export REPO_2PORTLAN=$WORK/repository/${REPO_NAME}
 export logFolder=$KM/work/${MACHINE_TYPE}/log
 export MASTER_BRANCH=master
 export SIM_IPaddress='192.168.56.102'
@@ -34,6 +34,8 @@ autocmd ColorScheme * highlight Whitespace gui=underline ctermbg=NONE guibg=NONE
 match Whitespace /  \+/' >> ~/.vimrc
 fi
 
+#bind '"\e[A": history-search-backward'
+#bind '"\e[B": history-search-forward'
 if [ ! -f ~/.inputrc ]; then
 	echo '"\e[A": history-search-backward' > ~/.inputrc
 	echo '"\e[B": history-search-forward' >> ~/.inputrc
@@ -55,6 +57,8 @@ function sgrep {
 	if [[ -n "$exten" ]]; then
 		if [[ "$exten" == "h" || "$exten" == "cpp" || "$exten" == "c" ]]; then
 			includes="--include=*.${exten}"
+		elif [[ "$exten" == all ]]; then
+			includes="--include=*"
 		elif [[ "$exten" != "-"* ]]; then
 			includes="--include=*${exten}*"
 		else
@@ -88,8 +92,9 @@ function sfind {
 function rmswapfile {
 	swapfile="-name *.swp \
 			-o -name *.swo \
+			-o -name *.bak \
 			-o -name *.swn "
-	rm -v `find ${BUILD_SOURCE} ${REPO_2PORTLAN} -type f ${swapfile}`
+	rm -v `find ${BUILD_SOURCE} ${REPO_PATH} -type f ${swapfile}`
 }
 function fgtab {
   echo "tput setf/setb - Foreground/Background table"
@@ -145,18 +150,18 @@ alias ports='netstat -tulanp'
 # This is GOLD for finding out what is taking so much space on your drives!
 alias diskspace="du -S | sort -n -r |more"
 
-alias 2portlan='cd ~/work/repository/IT5_42_2PortLan'
 alias work='cd /root/work'
 alias appsource='cd ~/work/KM3/KM/application'
-alias apprepo='cd ~/work/repository/${REPO_NAME}/KM/application'
+alias apprepo='cd ${REPO_PATH}/application'
 alias nvd_mfp='cd ~/work/KM3/KM/application/mfp/system/nvd'
 alias nvd_divlib='cd ~/work/KM3/KM/application/divlib/client/Proxy/system/nvd'
 alias errors='cat /root/work/KM3/KM/work/${MACHINE_TYPE}/log/errors.txt '
 alias build_mfp='~/work/buildmfp.sh'
 alias start_mount='~/work/start_mount.sh'
 alias end_mount='~/work/end_mount.sh'
-alias repo='cd ~/work/repository/${REPO_NAME}/'
+alias repo='cd ${REPO_PATH}'
 alias startMFP='cd /root; ./start-mfp.sh | tee -a ~/work/startMFP/log_start-mfp_`date +%F_%H%M%S`.txt'
+alias logFolder='cd $logFolder'
 
 alias mkdir="mkdir -p"
 alias lh='ls -lisAd .[^.]*'
@@ -167,7 +172,7 @@ alias egrep='egrep --color=auto'
 
 alias hs='history|grep -i '
 alias pss='ps -axf | grep -v grep | grep -i $1'
-alias tree='find . -type d | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"'
+alias showtree='find $1 -type d | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"'
 alias vi='vim'
 
 alias git_log="git log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"

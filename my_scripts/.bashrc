@@ -50,16 +50,16 @@ if [ -n "$force_color_prompt" ]; then
 fi
 
 if [ "$color_prompt" = yes ]; then
-    PS1='${debian_chroot:+($debian_chroot)}¥[¥033[01;32m¥]¥u@¥h¥[¥033[00m¥]:¥[¥033[01;34m¥]¥w¥[¥033[00m¥]¥$ '
+    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
 else
-    PS1='${debian_chroot:+($debian_chroot)}¥u@¥h:¥w¥$ '
+    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
 fi
 unset color_prompt force_color_prompt
 
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
 xterm*|rxvt*)
-    PS1="¥[¥e]0;${debian_chroot:+($debian_chroot)}¥u@¥h: ¥w¥a¥]$PS1"
+    PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
     ;;
 *)
     ;;
@@ -82,6 +82,7 @@ alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
 
+[[ -z "$MYALIASE" ]] && export MYALIASE=TRUE
 export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/local/pkgconfig
 export LD_LIBRARY_PATH=/km/fw/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib:$LD_LIBRARY_PATH
@@ -91,9 +92,9 @@ export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib:$LD_LIBRARY_PATH
 # ‾/.bash_aliases, instead of adding them here directly.
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
-#if [ -f ‾/.bash_aliases ]; then
- #   . /root/.bash_aliases
-#fi
+if [[ -f /root/.bash_aliases && "$MYALIASE" == "TRUE" ]]; then
+   . /root/.bash_aliases
+fi
 
 #. /root/.bash_aliases
 
