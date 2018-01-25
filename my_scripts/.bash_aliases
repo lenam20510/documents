@@ -6,18 +6,19 @@
 #
 #************export*************
 # machine_type=mmlk # zsb2z
-export WORK=/root/work
-export KM3=$WORK/KM3
-export KM=$KM3/KM
-export REPO_NAME=IT5_42_ZeusS_ZX0_SIM
-export REPO_PATH=$WORK/git/${REPO_NAME}
 export MACHINE_TYPE=zse3
 export ACTION=act2
 export QT_VERSION=q530
-export BUILD_SOURCE=${KM}/application
-export logFolder=$KM/work/${MACHINE_TYPE}/log
 export MASTER_BRANCH=master
 export SIM_IPaddress='192.168.56.102'
+export WORK=/root/work
+export KM3=$WORK/KM3
+export KM=$KM3/KM
+export BUILD_SOURCE=${KM}/application
+export KM_WORK=${KM}/work
+export logFolder=$KM/work/${MACHINE_TYPE}/log
+export REPO_NAME=IT5_42_ZeusS_ZX0_SIM
+export REPO_PATH=$WORK/git/${REPO_NAME}
 
 git config --global push.default current
 git config --global color.ui true
@@ -45,54 +46,79 @@ fi
 
 #*********Funtion*****************
 #grep with extention *.cpp or/and *.h or anything else
+
 function sgrep {
+	path=
+	options=
+	includes=
 	pattern="$1"
-	path="$2"
-	exten="$3"
-	addLine="${*:4}"
-	includes="--include=*.h --include=*.cpp --include=*.c --include=MediaMapFile*"
+	is_multi=
+	shift
+	
+	while [[ -n "$1" ]]; do
+		if [[ "$1" == "-e" ]]; then
+			shift
+			pattern="-e${pattern} -e$1"
+			is_multi=True
+		elif [[ "$1" == "-"* ]]; then
+			options+=" $1"
+		elif [[ "$1" == "all" ]]; then
+			includes=" --include=*"
+		elif [[ "$1" == "." && `echo $1 | wc -w` -eq 1 || "$1" == *"/"* ]]; then
+			path=$1
+		elif [[ "$1" == "."* ]]; then
+			includes+=" --include=*${1}"
+		else
+			includes+=" --include=*${1}*"
+		fi	
+		shift
+	done	
+	
+	if [[ -z "$includes" ]]; then
+		includes="--include=*.h --include=*.cpp --include=*.c --include=MediaMapFile*"
+	fi
 	if [[ -z "$path" ]]; then
 		path="."
 	fi
-	if [[ -n "$exten" ]]; then
-		if [[ "$exten" == "h" || "$exten" == "cpp" || "$exten" == "c" ]]; then
-			includes="--include=*.${exten}"
-		elif [[ "$exten" == all ]]; then
-			includes="--include=*"
-		elif [[ "$exten" != "-"* ]]; then
-			includes="--include=*${exten}*"
-		else
-			addLine=${exten}
-		fi
-	fi
 	includes+=" --exclude=*.bak --exclude=*.swp"
-	#command="grep --color=auto ${addLine} -rna $includes $pattern $path"
-	#echo $command
-	#echo
-	#$command
-	echo "grep --color=auto ${addLine} -rna $includes \"$pattern\" $path"
-	grep --color=auto ${addLine} -rna $includes "${pattern}" $path
+	options+=" -rna"
+	echo "grep --color=auto ${options} $includes "${pattern}" $path"
+	if [[ "$is_multi" == "True" ]]; then
+		grep --color=auto ${options} $includes ${pattern} $path
+	else
+		grep --color=auto ${options} $includes "${pattern}" $path
+	fi
 }
 function sfind {
-	path='.'
-	pattern=${1}
+	options=
+	path=
+	pattern=
 	notInclude="-not -name *.swp \
 				-not -name *.swo \
 				-not -name *.swn "
 
-	if [ $# -gt 1 ]; then
-		path=$1
-		pattern=$2
-	fi
+	while [[ -n "$1" ]]; do
+		if [[ "$1" == "-"* ]]; then
+			options+=" $1"
+		elif [[ "$1" == "." && `echo $1 | wc -w` -eq 1 || "$1" == *"/"* ]]; then
+			path=$1
+		else
+			pattern=$1
+		fi	
+		shift
+	done
 	[[ "$pattern" != *"."* ]] && pattern=${pattern}*
-	find $path -type f -iname *${pattern} \
+	find $path -type f ${options} -iname *${pattern} \
 		${notInclude} \
 		|  head | grep --color=auto '^\|[^/]*$' #color
 }
+
 function rmswapfile {
 	swapfile="-name *.swp \
 			-o -name *.swo \
 			-o -name *.bak \
+			-o -name *.rej \
+			-o -name *.orig \
 			-o -name *.swn "
 	rm -v `find ${BUILD_SOURCE} ${REPO_PATH} -type f ${swapfile}`
 }

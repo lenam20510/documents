@@ -3,7 +3,7 @@
 start=`date +%s`
 start_time=`date +%F_%H%M%S`
 #Default value:
-objects=$@
+PARAMS=$@
 CURR_DIR=`pwd`
 EXTEN_FILES='-name *.h -o -name *.cpp -o -name Makefile -o -name MediaMapFile*'
 # action=act2
@@ -49,8 +49,7 @@ function backupLogs {
 	mv $logFolder/*.txt $backupLogFolder
 }
 
-function extract_source {
-
+function analysis_Revision {
 	revision_begin=$1
 	revision_end=$2
 	# Set the latest revision
@@ -72,7 +71,7 @@ function extract_source {
 			if [ $count -lt 2 ]; then
 				previous_commit=$(echo $previous_commit | xargs )
 			else
-				previous_commit=$(echo $previous_commit | awk '{print $2;}' | xargs)
+				previous_commit=$(echo $previous_commit | awk '{print $1;}' | xargs)
 			fi
 			revision_begin=${previous_commit}
 		else
@@ -83,12 +82,89 @@ function extract_source {
 	if [[ -z $revision_end && -z $revision_begin ]]; then
 		revision_begin=HEAD
 	fi
-	
 	echo revision_begin=$revision_begin
 	echo revision_end=$revision_end
+}
+
+function strip {
+    local STRING=${1#$"$2"}
+    echo "${STRING%$"$2"}"
+}
+
+function Create_UT {
+	echo "Creating UT Spec... "
+	analysis_Revision all
+	cd ${REPO_PATH}
+	local branch=`git rev-parse --abbrev-ref HEAD`
+	echo
+	fld_UT=$WORK/UT_Spec; mkdir -p $fld_UT
+	file_diff=$fld_UT/${branch}_${revision_begin}_${revision_end}.patch; echo >$file_diff
+	file_UT=$fld_UT/${branch}_${revision_begin}_${revision_end}.txt; rm -f $file_UT
+	git diff $revision_begin $revision_end > $file_diff
+	file_diff_tmp=/tmp/UT_Spec_tmp.txt; touch $file_diff_tmp
+	yes | cp $file_diff $file_diff_tmp
+	
+	local all_diff_func=`cat $file_diff_tmp`
+	all_diff_func=$(echo "$all_diff_func" | grep -a -e diff -e ^[\@\@].*[\@\@] -e "::" \
+											| grep -a -v ".swp" \
+											| grep -a -v "Binary files" \
+											| grep -a -v ^'\-' \
+											| grep -a -v "\/\/" \
+											| grep -a -v ^[^\@].*[\;]) #^[^@].*[;]$
+	echo "$all_diff_func" > $file_diff_tmp
+	sed -i 's/\//\\/g' $file_diff_tmp # changing // to \\
+	# file_diff_tmp=~/work/tmp.txt
+	info_func=
+	file=
+	while IFS= read -r line 
+	do
+		[[ "$line" == *.swp ||  "$line" == *.bak ]] && continue
+		if [[ "$line" == "diff"* ]]; then
+			if [[ -n "$info_func" ]]; then
+				echo $info_func"	$file" | tee -a $file_UT
+				# printf '%s%s' $info_func $file | tee -a $file_UT
+				info_func=
+			fi
+			file=`echo "$line" | awk '{print $NF}' `
+			file=${file#"b\\"*}
+			file=${file#"application"*}
+			echo
+			echo "<-------------------------------------------------------------------------------------->"
+		elif [[ "$line" == "@@"* ]]; then
+			if [[ -n "$info_func" ]]; then
+				echo $info_func"	$file" | tee -a $file_UT
+
+			fi
+			# if [[ "$line" != *"$info_func"* ]]; then # Checking in case double function.
+			info_func=`printf '%s' "${line}" | awk '{for(i=5;i<=NF;++i) print $i}' ` #Don't xargs here
+			# printf '%s\n' "${func}" | tee -a $fld_UT
+			# fi
+		else
+			echo $line"	$file" | tee -a $file_UT
+			info_func=
+		fi 
+	done < $file_diff_tmp
+	if [[ -n "$info_func" ]]; then
+		echo $info_func"	$file" | tee -a $file_UT
+	fi
+	sed -i '$!N; /^\(.*\)\n\1$/!P; D'  ${file_UT} # remove duplicates
+	sed -i 's/\r//g'  ${file_UT} # remove CR
+	echo 
+	echo branch:$branch
+	echo '\\'${SIM_IPaddress}${file_diff} | sed  -e 's/\//\\/g'
+	echo '\\'${SIM_IPaddress}${file_UT} | sed  -e 's/\//\\/g'
+	# tr -d "\n\r" < ${file_UT}
+	cd $CURR_DIR
+	# rm -f $file_diff_tmp
+}
+
+function extract_source {
+
+	analysis_Revision $1 $2
 	
 	echo "------------------- $revision_begin:$revision_end ------------------------"
-	cd $CURR_DIR
+	cd ${REPO_PATH}
+	local branch=`git rev-parse --abbrev-ref HEAD`
 	des_folder=${WORK}"/extract_source/`date +%F_%H%M%S`_${branch}_${revision_begin}_${revision_end}"
 	mkdir -p $des_folder
 	rm -rf $des_folder/*
@@ -131,7 +207,7 @@ function extract_source {
 		# cp --parents ${REPO_PATH}/$line $new_folder
 		# cp --parents $ORIGINAL_SOURCE/KM3/KM/application/$line $old_folder
 	done < "$file_diff_name_only"
-
+	# Create_UT $file_diff
 	# tree $old_folder
 	# tree $new_folder
 	# Show tree new_folder
@@ -150,7 +226,6 @@ function extract_source {
 function updateSource {
 	echo "-->Updating source..."
 	local fileUpdateSource=${logFolder}/fileUpdateSource-${start_time}.txt
-	work=/root/work
 
 	# arr_upSource=(mfp divlib/client/Proxy divlib/server)
 	arr_upSource=(mfp divlib/client/Proxy/system/ divlib/client/Proxy/nicfum divlib/server/Stub)
@@ -188,8 +263,8 @@ function updateSource {
 }
 
 function compareFolder {
-	local first_fld=`echo $(cd ${1}; pwd; cd $CURR_DIR)`
-	local second_fld=`echo $(cd ${2}; pwd; cd $CURR_DIR)`
+	local first_fld=`readlink -f ${1}`
+	local second_fld=`readlink -f ${2}`
 	first_fld_name=`echo $first_fld | sed  -e 's/\///g'`
 	second_fld_name=`echo $second_fld | sed  -e 's/\///g'`
 	local cmpFld=${WORK}/compareFolder/${first_fld_name}-${second_fld_name}-${start_time}
@@ -277,6 +352,10 @@ function startMFP {
 IS_UpdatedSource=True
 IS_BackupLog=True
 IS_Build=True
+##Getting
+#MACHINE_TYPE
+# result=`ls ${KM_WORK} -l | grep ^d | head -1 | awk '{print $NF}'`
+# echo Machine Type: $result
 
 if [[ "$1" == "-h" ]]; then
 	Help
@@ -285,6 +364,8 @@ elif [[ "$1" == "-bl" ]]; then
 	backupLogs
 elif [[ "$1" == "-us" ]]; then
 	updateSource
+elif [[ "$1" == "-ut" ]]; then
+	Create_UT
 elif [[ "$1" == "-es" ]]; then
 	extract_source $2 $3
 elif [[ "$1" == "-cmp" ]]; then
