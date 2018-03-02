@@ -3,154 +3,169 @@
 start=`date +%s`
 start_time=`date +%F_%H%M%S`
 #Default value:
-objects=$@
-action=act2
+PARAMS=$@
+CURR_DIR=`pwd`
+EXTEN_FILES='-name *.h -o -name *.cpp -o -name Makefile -o -name MediaMapFile*'
+REPO_PATH_TO_APP=application
+# action=act2
 # machine_type=zsb2z
 # machine_type=zse3
 # machine_type=mmlk
-machine_type=a64_mv7040
-KM3=/root/work/KM3
-KM=$KM3/KM
-WORK=/root/work
-REPO_2PORTLAN=$WORK/repository/IT6_Dev
-BUILD_SOURCE=KM3/KM/application
-Build_SOURCE=$WORK/KM3/KM/application
-ORIGINAL_SOURCE=$WORK/original_source
-
-FILE_BRANCH=$logFolder/branch.txt
-FILE_CHANGES=(	APIC_Setting_MailSendSetting.h NVDC_Setting_MailSendSetting.h
-				NVDC_NetworkSetting.cpp stub_APIC_Setting.cpp
-				APIC_Setting_common.h NVDC_ClassDefineTbl.h
-				NVDC_Setting_CopyScanJobSetting.h)
-FILE_NOT_UPDATE=( NVDC_DebugAPI.h NVDC_DebugAPI.cpp )
+# repo_name=${REPO_NAME}
+# machine_type=${MACHINE_TYPE}
+# [ -n ${REPO_NAME} ] && repo_name=${REPO_NAME}
+# [ -n ${MACHINE_TYPE} ] && machine_type=${MACHINE_TYPE}
 
 function Help() {
-	echo "              Copy buildmfp.sh to /root/work folder"
-	echo "              Usage: ./buildmfp.sh"
-	echo "              Ex: ./buildmfp.sh -a mfpact2 (default: act2)"
+	echo "     Copy buildmfp.sh to /root/work folder"
+	echo "        Usage:"
+	echo "              1) ./buildmfp.sh -us"
+	echo "               	Update source code from repository [${REPO_PATH}] to [${BUILD_SOURCE}]"
+	echo "              2) ./buildmfp.sh -es [First commit] [End commit]"
+	echo "               	Create two new & old folder from repository [${REPO_PATH}]"
+	echo "              3) ./buildmfp.sh [Option]"
+	echo "              [Option] :"
+	echo "                      -a      :   action build (act2, divact2, mfpact2, ...). default: act2"
+	echo "                      -m      :   machine type (zse3, mmlk, a64_mv7040, ...). default: a64_mv7040"
+	echo "                      -notus  :   Do not update source code from repository.  default: Yes"
+	echo "                      -notbl  :   Do not backup log.                          default: Yes"
+	echo "              Ex: ./buildmfp.sh -a mfpact2 -m a64_mv7040 -notus"
 }
 
 function backupLogs {
+	echo "-->BackupLogs..."
 	ls $logFolder/*.log >> /dev/null
 	if [ $? -ne 0 ]; then
 		return
 	fi
-	prefix=${action}
+	prefix=default-${start_time}
 	if [ -f $FILE_BRANCH ]; then
 		local branch=`cat $FILE_BRANCH`
-		[[ -n "$branch" ]] && prefix+="_$branch"
+		[[ -n "$branch" ]] && prefix="$branch"
 	fi
-	backupLogFolder=$logFolder/backup_log_${start_time}_${prefix}
+	backupLogFolder=$logFolder/backup_log-${prefix}
 	mkdir -p $backupLogFolder
 	echo "Moving all logs to $backupLogFolder"
 	mv $logFolder/*.log $backupLogFolder
 	mv $logFolder/*.txt $backupLogFolder
 }
 
-function removeObjects {
-	echo "Removing objects: $objects ..."
-	for ob_find in ${objects[*]}
-	do
-		obs=`find $KM/* -name  "$ob_find.o"`
-		for ob in ${obs[*]} 
-		do
-			echo $ob
-			rm -f $ob
-		done
-	done
-} 
-
-function refreshFiles {
-	echo "Refresh files ..."
-	for file in ${FILE_CHANGES[*]}
-	do
-		fls=`find $KM/* -name  "$file"`
-		for fl in ${fls[*]} 
-		do
-			echo $fl
-			touch $fl
-		done
-	done
-}
-
-function extract_file {
-	files="$1"
-	local search_fd="$2"
-	local target_fd="$3"
-	local curr_dir=`pwd`
-	# echo "$@"
-	cd $search_fd
-	for file in ${files[*]}
-	do
-		fls=`find ./* -name  "$file"`
-		# echo "$fls"
-		for fl in ${fls[*]} 
-		do
-			dir=$(dirname "${fl}")
-			dir=$(echo "$dir" | sed 's/.//')
-			target_fl=$target_fd/$dir
-			mkdir -p $target_fl
-			cp $fl $target_fl
-		done
-	done
-	cd $curr_dir
-}
-
-function report {
-	# parameters=$@
-	listFile=$WORK/filelist.txt
-	target=$WORK/report
-	if [[ -n "$@" ]]; then
-		old_source=$WORK/$1
-		repo_source=$WORK/$2
-	else
-		old_source=$WORK/original_source/KM3/KM/application
-		repo_source=$WORK/repository/2PortLan
-	fi
-	rm -rf $WORK/report/*
-	report_new_dir=$target/new
-	report_old_dir=$target/old
-	mkdir -p $report_new_dir
-	mkdir -p $report_old_dir
-	curr_dir=`pwd`
-	for file in `cat $listFile`
-	do
-		cd $repo_source
-		cp $file --parents $report_new_dir/
-		cd $old_source
-		cp $file --parents $report_old_dir/
-	done
-	cd $curr_dir
-}
-
-function find_diff {
-	local old_source=$WORK/"$1"
-	local new_source=$WORK/"$2"
-	target=$WORK/diff
-	diff_new_dir=$target/new
-	diff_old_dir=$target/old
-	files=`find $old_source/* -type f -name "*.h" -o  -name "*.cpp"`
-}
-
-function extract_source {
-
+function analysis_Revision {
 	revision_begin=$1
 	revision_end=$2
 	# Set the latest revision
 	source_OPA=
+	cd ${REPO_PATH}
+	local branch=`git rev-parse --abbrev-ref HEAD`
 	
 	#revision_end=""
 	#revision_end="HEAD"
+	if [[ "${revision_begin}" == "all" ]]; then
+		if [[ "$branch" != "${MASTER_BRANCH}" ]]; then
+			rev_list_branch=`git rev-list ${branch}`
+			rev_list_master_branch=`git rev-list ^${MASTER_BRANCH} ${branch}`
+			# get first commit of a branch
+			# first_commit_branch=$(git rev-list ^${MASTER_BRANCH} ${branch} | tail -n 1)
+			# get previous commit before the first commit of this branch.
+			previous_commit=$(echo ${rev_list_branch} | cut -c$((${#rev_list_master_branch}+1))-)
+			count=$(echo "$previous_commit" | wc -w)
+			if [ $count -lt 2 ]; then
+				previous_commit=$(echo $previous_commit | xargs )
+			else
+				previous_commit=$(echo $previous_commit | awk '{print $1;}' | xargs)
+			fi
+			revision_begin=${previous_commit}
+		else
+			revision_begin=`git rev-list ${branch} | tail -n1`
+		fi
+		revision_end=
+	fi
 	if [[ -z $revision_end && -z $revision_begin ]]; then
 		revision_begin=HEAD
 	fi
-	
 	echo revision_begin=$revision_begin
 	echo revision_end=$revision_end
+}
+
+function strip {
+    local STRING=${1#$"$2"}
+    echo "${STRING%$"$2"}"
+}
+
+function Create_UT {
+	echo "Creating UT Spec... "
+	analysis_Revision all
+	cd ${REPO_PATH}
+	local branch=`git rev-parse --abbrev-ref HEAD`
+	echo
+	fld_UT=$WORK/UT_Spec; mkdir -p $fld_UT
+	file_diff=$fld_UT/${branch}_${revision_begin}_${revision_end}.patch; echo >$file_diff
+	file_UT=$fld_UT/${branch}_${revision_begin}_${revision_end}.txt; rm -f $file_UT
+	git diff $revision_begin $revision_end > $file_diff
+	file_diff_tmp=/tmp/UT_Spec_tmp.txt; touch $file_diff_tmp
+	yes | cp $file_diff $file_diff_tmp
+	
+	local all_diff_func=`cat $file_diff_tmp`
+	all_diff_func=$(echo "$all_diff_func" | grep -a -e diff -e ^[\@\@].*[\@\@] -e "::" \
+											| grep -a -v ".swp" \
+											| grep -a -v "Binary files" \
+											| grep -a -v ^'\-' \
+											| grep -a -v "\/\/" \
+											| grep -a -v ^[^\@].*[\;]) #^[^@].*[;]$
+	echo "$all_diff_func" > $file_diff_tmp
+	sed -i 's/\r//g'  ${file_diff_tmp} # remove CR
+	# file_diff_tmp=~/work/tmp.txt
+	info_func=
+	file=
+	while IFS= read -r line 
+	do
+		[[ "$line" == *.swp ||  "$line" == *.bak ]] && continue
+		if [[ "$line" == "diff"* ]]; then
+			if [[ -n "$info_func" ]]; then
+				echo $info_func"	$file" | tee -a $file_UT
+				# printf '%s%s' $info_func $file | tee -a $file_UT
+				info_func=
+			fi
+			file=`echo "$line" | awk '{print $NF}' `
+			file=${file#"b/"*}
+			# file=${file#"application"*}
+			echo
+			echo "<-------------------------------------------------------------------------------------->"
+		elif [[ "$line" == "@@"* ]]; then
+			if [[ -n "$info_func" ]]; then
+				echo $info_func"	$file" | tee -a $file_UT
+
+			fi
+			info_func=`printf '%s' "${line}" | awk '{for(i=5;i<=NF;++i) print $i}' ` #Don't xargs here
+		else
+			echo $line"	$file" | tee -a $file_UT
+			info_func=
+		fi 
+	done < $file_diff_tmp
+	if [[ -n "$info_func" ]]; then
+		echo $info_func"	$file" | tee -a $file_UT
+	fi
+	sed -i '$!N; /^\(.*\)\n\1$/!P; D'  ${file_UT} # remove duplicates
+	# sed -i 's/\r//g'  ${file_UT} # remove CR
+	sed -i 's/\//\\/g' ${file_UT} # changing '//' to '\\'
+	sed -i "s/${REPO_PATH_TO_APP}//g" ${file_UT} # remove path to application
+	echo 
+	echo branch:$branch
+	echo '\\'${SIM_IPaddress}${file_diff} | sed  -e 's/\//\\/g'
+	echo '\\'${SIM_IPaddress}${file_UT} | sed  -e 's/\//\\/g'
+	# tr -d "\n\r" < ${file_UT}
+	cd $CURR_DIR
+	# rm -f $file_diff_tmp
+}
+
+function extract_source {
+
+	analysis_Revision $1 $2
 	
 	echo "------------------- $revision_begin:$revision_end ------------------------"
-	cur_folder=`pwd`
-	des_folder=${WORK}"/extract_source/`date +%F`_${revision_begin}_${revision_end}"
+	cd ${REPO_PATH}
+	local branch=`git rev-parse --abbrev-ref HEAD`
+	des_folder=${WORK}"/extract_source/`date +%F_%H%M%S`_${branch}_${revision_begin}_${revision_end}"
 	mkdir -p $des_folder
 	rm -rf $des_folder/*
 	file_diff_name_only=$des_folder/file_diff_name_only.txt
@@ -167,7 +182,7 @@ function extract_source {
 	# This is one-line command to get list file from "revision_begin" to "revision_end".
 	# And, perform copying changed files to new location by keep folder structure same as source file.
 	# git diff 06a3af6 8174c67 --name-only
-	cd $REPO_2PORTLAN
+	cd ${REPO_PATH}
 	git diff $revision_begin $revision_end > $file_diff
 	git diff $revision_begin $revision_end --name-only > $file_diff_name_only
 	# git diff $revision_begin $revision_end --name-only | 
@@ -176,6 +191,12 @@ function extract_source {
 		dir_name_file=$(dirname "${line}")
 		mkdir -p $old_folder/$dir_name_file
 		git show ${revision_begin}:$line > $old_folder/$line
+		if [ $? -ne 0 ]; then # If having a error, we will find first commit of this file.
+			first_commit_line=$(git log --diff-filter=A -- ${line} | head -n1 | cut -d ' ' -f2)
+			echo "first_commit_line:${first_commit_line}"
+			rm -f $old_folder/$line
+			git show ${first_commit_line}:$line > $old_folder/$line
+		fi
 		
 		mkdir -p $new_folder/$dir_name_file
 		if [[ -n $revision_end ]]; then
@@ -183,85 +204,51 @@ function extract_source {
 		else
 			cp $line $new_folder/$line
 		fi
-		# cp --parents $REPO_2PORTLAN/$line $new_folder
+		# cp --parents ${REPO_PATH}/$line $new_folder
 		# cp --parents $ORIGINAL_SOURCE/KM3/KM/application/$line $old_folder
 	done < "$file_diff_name_only"
+	# Create_UT $file_diff
+	# tree $old_folder
+	# tree $new_folder
+	# Show tree new_folder
+	echo
+	echo '\\'${SIM_IPaddress}${des_folder} | sed  -e 's/\//\\/g'
+	cd ${des_folder}
+	find ./new | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"
+	addedLine=`diff -r old new | grep "> " | wc -l`
+	echo "Modified line number: ${addedLine}"
+	rm -f ${file_diff_name_only}; rm -f ${file_diff}
 
-	# cd $new_folder
-	# mkdir -p ./KM3/KM/application/
-	# mv .$REPO_2PORTLAN/* ./KM3/KM/application/
-	# rm -rf ./root/
-	
-	# cd $old_folder
-	# mkdir -p ./KM3/KM/application/
-	# mv .$ORIGINAL_SOURCE/KM3/KM/application/* ./KM3/KM/application/
-	# rm -rf ./root/
-	
-	cd $cur_folder
-
-	tree $old_folder
-	tree $new_folder
-
-	echo "------------------------------------------------------------"
-	echo ""
-}
-
-function copy_source {
-	curr_dir=`pwd`
-	folder_REPO=~/work/folder_REPO_BUILD/REPO
-	folder_BUILD=~/work/folder_REPO_BUILD/BUILD
-	fileUpdateSource=~/work/folder_REPO_BUILD/fileUpdateSource.txt
-	rm -f $fileUpdateSource
-	rm -rf ~/work/folder_REPO_BUILD
-	mkdir -p $folder_REPO
-	mkdir -p $folder_BUILD
-	work=/root/work
-	build_source=~/work/KM3/KM/application
-	arr_upSource=(mfp divlib)
-	cd /root/work/repository/IT6_Dev/KM/application
-	for path in ${arr_upSource[*]}
-	do
-		files=`find $path/* -type f -name "*.h" -o  -name "*.cpp" -o -name "Makefile"`
-		for file in ${files[*]}
-		do
-			file_name=$(basename "${file}")
-			file_build_sour=$build_source/$file
-			`cmp --silent $file $file_build_sour`
-			if [ $? -ne 0 ]; then
-				echo $file | tee -a $fileUpdateSource
-				dirname_file_build_sour=$(dirname "${file_build_sour}")
-				cp $file --parents $folder_REPO
-				cp $build_source/$file --parents $folder_BUILD
-				fi
-		done
-	done
-	mv $folder_BUILD/$build_source/* $folder_BUILD
-	rm -rf $folder_BUILD/root
-	# echo "cp -r $folder_OAP/* ~/work/KM3/KM/applicastion/"
-	# yes | cp -r $folder_OAP/* ~/work/KM3/KM/application/
-	cd $curr_dir
+	cd $CURR_DIR
+	echo "-----------------------------------------------------"
 }
 
 function updateSource {
-	echo "Updating source..."
+	echo "-->Updating source..."
 	local fileUpdateSource=${logFolder}/fileUpdateSource-${start_time}.txt
-	work=/root/work
 
+	# arr_upSource=(mfp divlib/client/Proxy divlib/server)
 	arr_upSource=(mfp divlib/client/Proxy/system/ divlib/client/Proxy/nicfum divlib/server/Stub)
 	# arr_upSource=(mfp divlib)
-	curr_dir=`pwd`
 	ops_find='-name "*.h" -o  -name "*.cpp" -o -name Makefile'
 	touch ${fileUpdateSource}
 	echo fileUpdateSource:$fileUpdateSource
-	cd $REPO_2PORTLAN
-	cd KM/application
+	cd ${REPO_PATH}
+	
+	subflds=`ls . -1 | grep -vE "/usr|^$"`
+	if [[ "$subflds" == *"KM"* ]]; then
+		cd KM/application
+	elif [[ "$subflds" == *"application"* ]]; then
+		cd application
+	fi
+	
 	for path in ${arr_upSource[*]}
 	do
-		files=`find $path/* -type f -name "*.h" -o -name "*.cpp" -o -name "Makefile" -o -name "MediaMapFile*"`
+		files=`find $path/* -type f ${EXTEN_FILES}`
 		for file in ${files[*]}
 		do
 			file_name=$(basename "${file}")
-			file_build_sour=$WORK/$BUILD_SOURCE/$file
+			file_build_sour=$BUILD_SOURCE/$file
 			`cmp --silent $file $file_build_sour`
 			if [ $? -ne 0 ]; then
 				echo $file $file_build_sour | tee -a $fileUpdateSource
@@ -272,82 +259,53 @@ function updateSource {
 			fi
 		done
 	done
-	cd $curr_dir
+	cd $CURR_DIR
 }
 
-function diff_report {
-	local commands="diff --suppress-common-lines -r -u --strip-trailing-cr"
-	local work_fld=/root/work
-	local old_file=""
-	local new_file=""
-	local id=""
-	while [[ "$1" != "" ]]; do
-		case "$1" in
-			-id)
-				shift
-				id=$1
-			;;
-			-old)
-				shift
-				old_file="$1"
-			;;
-			-new)
-				shift
-				new_file="$1"
-			;;
-		esac
-		shift
+function compareFolder {
+	local first_fld=`readlink -f ${1}`
+	local second_fld=`readlink -f ${2}`
+	first_fld_name=`echo $first_fld | sed  -e 's/\///g'`
+	second_fld_name=`echo $second_fld | sed  -e 's/\///g'`
+	local cmpFld=${WORK}/compareFolder/${first_fld_name}-${second_fld_name}-${start_time}
+	local cmpFld_first=${cmpFld}/${first_fld_name}
+	local cmpFld_second=${cmpFld}/${second_fld_name}
+	mkdir -p ${cmpFld_first}; mkdir -p ${cmpFld_second}
+	local fileUpdateSource=${cmpFld}/fileUpdateSource-${start_time}.txt
+	
+	# diff all files
+	`diff --brief --recursive --no-dereference --new-file --no-ignore-file-name-case ${first_fld} ${second_fld} > ${fileUpdateSource}`
+	echo "*********************************different************************************" | tee -a ${fileUpdateSource}
+	cd ${first_fld}
+	files=`find * -type f ${EXTEN_FILES}`
+	for file in ${files[*]}
+	do
+		file_2nd=${second_fld}/$file
+		`cmp --silent $file $file_2nd`
+		if [ $? -ne 0 ]; then
+			echo $file $file_2nd | tee -a $fileUpdateSource
+			cp --parents ${file} ${cmpFld_first}
+			cp --parents ${file_2nd} ${cmpFld_second}
+		fi
 	done
-	if [[ -z "$id" || -z "$old_file" || -z "$new_file" ]]; then
-		return
-	fi
-	old_file=$(echo "$old_file" | sed "s/\\\/\\//g")
-	new_file=$(echo "$new_file" | sed "s/\\\/\\//g")
-	fileName=$(basename "$new_file")
-
-	source_old_file=$work_fld/$old_file
-	source_new_file=$work_fld/$new_file
-	local fld_report=diff_report/$id
-	#mkdir -p $fld_report
-	
-	#dir_old_file=$(dirname "${old_file}")
-	dir_new_file=$(dirname "${new_file}")
-	dir_old_file=$fld_report/old/$dir_new_file
-	dir_new_file=$fld_report/new/$dir_new_file
-	#comment
-	#mkdir -p $dir_old_file; 
-	#mkdir -p $dir_new_file
-	#comment
-	#cp $source_old_file $dir_old_file
-	#cp $source_new_file $dir_new_file
-	
-	
-	cd diff_report
-	local diff_file=$id/$id.txt
-	#cp $source_new_file $id/
-	
-	#comment
-	#$commands $id/old/* $id/new/* > $diff_file
-	$commands $old_file $new_file > $diff_file
+	mv ${cmpFld_second}/${second_fld}/* ${cmpFld_second}
+	rm -r ${cmpFld_second}/$(echo "$second_fld" | cut -d "/" -f2)
 }
 
 function startBuild {
-	echo "Build starting..."
-	curr_dir=`pwd`
+	echo "-->Build starting..."
 	build_log=$logFolder/build-log-$start_time.txt
-	# pmake_log=$logFolder/pmake-log.txt
-	cd $REPO_2PORTLAN
+	error_log=$logFolder/errors.txt
+	cd ${REPO_PATH}
 	local branch=`git rev-parse --abbrev-ref HEAD`
-	echo $branch > $FILE_BRANCH
-	cd $curr_dir
+	echo ${start_time}-${branch}-${MACHINE_TYPE}-${ACTION} > $FILE_BRANCH
+	cd $CURR_DIR
 	#start build
-	echo $KM/pmake
 	cd $KM/pmake
-	echo "./pmake.sh $machine_type $action q530 e s n 4"
-	$(./pmake.sh $machine_type $action q530 e s n 4 | tee -a $build_log) &
+	echo "./pmake.sh $MACHINE_TYPE ${ACTION} ${QT_VERSION} e s n 4"
+	$(./pmake.sh $MACHINE_TYPE ${ACTION} ${QT_VERSION} e s n 4 | tee -a $build_log) &
 	sleep 5
 	loop=true
-	error_log=$logFolder/errors.txt
 	while [[ -n "$loop" ]]; do
 		id=`ps -ef | grep -v "grep" | grep ./pmake.sh`
 		if [ $? -ne 0 ]; then
@@ -359,82 +317,89 @@ function startBuild {
 			let minutes=(deltatime/60)%60
 			let seconds=deltatime%60
 			printf "*************************%d:%02d:%02d*****************************\n" $hours $minutes $seconds
-			errors=`find $logFolder/*.log | xargs grep "error:"`
-			if [[ -n "$errors" ]]; then
-				echo "$errors" > $error_log &
-				echo "$errors"
-				echo
+			# errors=`find $logFolder/*.log | xargs grep --color=auto "error:"`
+			errors=`egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}`
+			echo "$errors"
+			if [[ -n "$errors" && "$errors" == *"error:"* ]]; then
+				echo "`grep -n -B5 -A5 --color=always "error:" ${build_log}`" > $error_log &
 			fi
+			echo
 		fi
 		sleep 30
 	done
-	printf "Total build time ($machine_type): %d:%02d:%02d\n" $hours $minutes $seconds
-	cd $curr_dir
-	return 0
+	printf "Total build time ($MACHINE_TYPE): %d:%02d:%02d\n" $hours $minutes $seconds
+	`egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}`
+	cd $CURR_DIR
+	exit 0
 }
 
-function findByFile {
-	local pattern=$1
-	local file=$2
-	local result=
-	result=`grep -ni $pattern $file`
-	echo "$result"
-}
-
-function findByFolder {
-	local pattern=$1
-	local folder="$2"
-	echo $folder
-	echo "find ${folder} -name "*.cpp" -o -name "*.h""
-	local listFiles=`find $folder -name "*.cpp" -o -name "*.h"`
-	echo $listFiles
-	# for file in "$listFiles"
-	# do
-		# echo $file
-	# done
-}
-
-function findSipPattern {
-	local fileFolder=~/work/FolderList.txt
-	local pattern="sip"
-	local path=
-	while read line
+function addMoreFiles {
+	local source="$1"
+	local destination="$2"
+	local file="$3"
+	[[ -z $source || -z $destination ||  -z $file ]] && echo "Failed" && return
+	cd $source
+	while IFS= read -r line
 	do
-		command="find $KM3/$line -name "*.cpp""
-		echo "$command"
-		$command
-		done < "$fileFolder"
+		if [[ -n "$line" ]]; then
+			echo "$line ${destination}/$line"
+			cp --parents $line ${destination}/
+		fi
+	done < $file
+	cd $CURR_DIR
+}
+
+function startMFP {
+	local log_fld=~/work/startMFP
+	mkdir -p ${log_fld}
+	mkdir -p ${log_fld}/old
+	mv ${log_fld}/*.txt ${log_fld}/old
+	local log_file=${log_fld}/log_start-mfp_${start_time}.txt
+	
+	export MYALIASE=F ; source ~/.bashrc
+	cd /root
+	./start-mfp.sh | tee -a ${log_file}
+	
+	# export MYALIASE=TRUE ; source ~/.bashrc
+	# cd ${curr_fld}
+	return
 }
 
 IS_UpdatedSource=True
 IS_BackupLog=True
+IS_Build=True
+##Getting
+#MACHINE_TYPE
+# result=`ls ${KM_WORK} -l | grep ^d | head -1 | awk '{print $NF}'`
+# echo Machine Type: $result
 
 if [[ "$1" == "-h" ]]; then
 	Help
 	exit 0
-elif [[ "$1" == "-r" ]]; then
-	if [[ -n "${*:2}" ]]; then
-		report "$2" "$3"
-	# else
-		# report "${FILE_CHANGES[*]}"
-	fi
-	
-elif [[ "$1" == "-cs" ]]; then
-	copy_source
+elif [[ "$1" == "-bl" ]]; then
+	backupLogs
 elif [[ "$1" == "-us" ]]; then
 	updateSource
+elif [[ "$1" == "-ut" ]]; then
+	Create_UT
 elif [[ "$1" == "-es" ]]; then
 	extract_source $2 $3
-elif [[ "$1" == "-sip" ]]; then
-	findSipPattern 
+elif [[ "$1" == "-amf" ]]; then #Added more files
+	addMoreFiles $2 $3 $4
+elif [[ "$1" == "-cmp" ]]; then
+	[[ -z $2 || -z $3 ]] && exit 
+	compareFolder $2 $3 $4
+elif [[ "$1" == "-smfp" ]]; then
+	startMFP
 else #Start build
 	while [[ -n "$1" ]]; do
 		if [[ "$1" == "-a" ]]; then
 			shift
-			action=$1
+			export ACTION=$1
 		elif [[ "$1" == "-m" ]]; then
 			shift
-			machine_type=$1
+			export MACHINE_TYPE=$1
+			export logFolder=$KM/work/$MACHINE_TYPE/log
 		elif [[ "$1" == "-notus" ]]; then
 			IS_UpdatedSource=
 		elif [[ "$1" == "-notbl" ]]; then
@@ -442,17 +407,19 @@ else #Start build
 		fi	
 		shift
 	done	
-	export logFolder=$KM/work/$machine_type/log
-	echo action: $action
-	echo machine_type: $machine_type
-	echo logFolder:$logFolder
-	# echo objects: $objects
-	# removeObjects
-	[[ "$IS_UpdatedSource" == "True" ]] && updateSource
+	FILE_BRANCH=$logFolder/info_start_build.txt
+	echo action: $ACTION
+	echo machine_type: $MACHINE_TYPE
+	echo 
+	# checking buildmfp.sh was existed or not
+	check=`ps -ef | grep buildmfp.sh | grep -v grep`
+	[ $? -ne 0 ] && exit 0
 	[[ "$IS_BackupLog" == "True" ]] && backupLogs
-	
-	# updateSource
-	# refreshFiles
-	startBuild
+	[[ "$IS_UpdatedSource" == "True" ]] && updateSource
+	[[ "$IS_Build" == "True" ]] && startBuild
+	exit 0
 fi
+
+# Added more files to Repository
+#while IFS= read -r line ; do echo $line; cp --parents $line ~/work/git/IT5_42_ZeusS_ZX0_SIM/; done < ~/work/list_file
 

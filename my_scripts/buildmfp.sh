@@ -6,6 +6,7 @@ start_time=`date +%F_%H%M%S`
 PARAMS=$@
 CURR_DIR=`pwd`
 EXTEN_FILES='-name *.h -o -name *.cpp -o -name Makefile -o -name MediaMapFile*'
+REPO_PATH_TO_APP=application
 # action=act2
 # machine_type=zsb2z
 # machine_type=zse3
@@ -112,7 +113,7 @@ function Create_UT {
 											| grep -a -v "\/\/" \
 											| grep -a -v ^[^\@].*[\;]) #^[^@].*[;]$
 	echo "$all_diff_func" > $file_diff_tmp
-	sed -i 's/\//\\/g' $file_diff_tmp # changing // to \\
+	sed -i 's/\r//g'  ${file_diff_tmp} # remove CR
 	# file_diff_tmp=~/work/tmp.txt
 	info_func=
 	file=
@@ -126,8 +127,8 @@ function Create_UT {
 				info_func=
 			fi
 			file=`echo "$line" | awk '{print $NF}' `
-			file=${file#"b\\"*}
-			file=${file#"application"*}
+			file=${file#"b/"*}
+			# file=${file#"application"*}
 			echo
 			echo "<-------------------------------------------------------------------------------------->"
 		elif [[ "$line" == "@@"* ]]; then
@@ -135,10 +136,7 @@ function Create_UT {
 				echo $info_func"	$file" | tee -a $file_UT
 
 			fi
-			# if [[ "$line" != *"$info_func"* ]]; then # Checking in case double function.
 			info_func=`printf '%s' "${line}" | awk '{for(i=5;i<=NF;++i) print $i}' ` #Don't xargs here
-			# printf '%s\n' "${func}" | tee -a $fld_UT
-			# fi
 		else
 			echo $line"	$file" | tee -a $file_UT
 			info_func=
@@ -148,7 +146,9 @@ function Create_UT {
 		echo $info_func"	$file" | tee -a $file_UT
 	fi
 	sed -i '$!N; /^\(.*\)\n\1$/!P; D'  ${file_UT} # remove duplicates
-	sed -i 's/\r//g'  ${file_UT} # remove CR
+	# sed -i 's/\r//g'  ${file_UT} # remove CR
+	sed -i 's/\//\\/g' ${file_UT} # changing '//' to '\\'
+	sed -i "s/${REPO_PATH_TO_APP}//g" ${file_UT} # remove path to application
 	echo 
 	echo branch:$branch
 	echo '\\'${SIM_IPaddress}${file_diff} | sed  -e 's/\//\\/g'
@@ -228,7 +228,7 @@ function updateSource {
 	local fileUpdateSource=${logFolder}/fileUpdateSource-${start_time}.txt
 
 	# arr_upSource=(mfp divlib/client/Proxy divlib/server)
-	arr_upSource=(mfp divlib/client/Proxy/system/ divlib/client/Proxy/nicfum divlib/server/Stub)
+	arr_upSource=(mfp divlib/client/Proxy/system/ divlib/server/Stub)
 	# arr_upSource=(mfp divlib)
 	ops_find='-name "*.h" -o  -name "*.cpp" -o -name Makefile'
 	touch ${fileUpdateSource}
@@ -333,6 +333,25 @@ function startBuild {
 	exit 0
 }
 
+# $1: source folder
+# $2: destination folder
+# $3: list file
+function addMoreFiles {
+	local source="$1"
+	local destination="$2"
+	local file="$3"
+	[[ -z $source || -z $destination ||  -z $file ]] && echo "Failed" && return
+	cd $source
+	while IFS= read -r line
+	do
+		if [[ -n "$line" ]]; then
+			echo "$line ${destination}/$line"
+			cp --parents $line ${destination}/
+		fi
+	done < $file
+	cd $CURR_DIR
+}
+
 function startMFP {
 	local log_fld=~/work/startMFP
 	mkdir -p ${log_fld}
@@ -368,6 +387,8 @@ elif [[ "$1" == "-ut" ]]; then
 	Create_UT
 elif [[ "$1" == "-es" ]]; then
 	extract_source $2 $3
+elif [[ "$1" == "-amf" ]]; then #Added more files
+	addMoreFiles $2 $3 $4
 elif [[ "$1" == "-cmp" ]]; then
 	[[ -z $2 || -z $3 ]] && exit 
 	compareFolder $2 $3 $4
@@ -401,4 +422,7 @@ else #Start build
 	[[ "$IS_Build" == "True" ]] && startBuild
 	exit 0
 fi
+
+# Added more files to Repository
+#while IFS= read -r line ; do echo $line; cp --parents $line ~/work/git/IT5_42_ZeusS_ZX0_SIM/; done < ~/work/list_file
 

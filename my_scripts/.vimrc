@@ -5,7 +5,7 @@ set runtimepath^=~/.vim/bundle/vscode-youcompleteme-master
 "AutoComplPop does not support this version of vim (701).
 "set runtimepath^=~/.vim/bundle/AutoComplPop-master
 
-" General setup
+"----------------------General setup-----------------------------------
 autocmd QuickFixCmdPost [^l]* nested cwindow
 autocmd QuickFixCmdPost    l* nested lwindow
 syntax on
@@ -18,18 +18,14 @@ set softtabstop=4   " number of spaces in tab when editing
 " :e ++enc=sjis
 " set fileencodings=iso-2022-jp,euc-jp,cp932,utf8,default,latin1
 set encoding=sjis
-"set nowrap
-"set nowrap
+set nowrap
 "set listchars=eol:$,tab:>-,trail:~,extends:>,precedes:<
 "set list
-set wrap
+"set wrap
 set linebreak
 hi StatusLine                  ctermfg=4   "  ctermbg=8     cterm=NONE
 hi StatusLineNC                ctermfg=2     ctermbg=8     cterm=NONE
-
-"To create a new tab
-"nnoremap <C-t> :tabnew<Space>
-"inoremap <C-t> <Esc>:tabnew<Space>
+set shellcmdflag=-ic "Using alias in Vim
 
 set wildmenu " visual autocomplete for command menu"
 set showmatch           " highlight matching [{()}]}]"
@@ -41,7 +37,14 @@ set hlsearch            " highlight matches
 nnoremap gV `[v`]
 set ignorecase
 set smartcase
-" CtrlP settings
+"----------------------TAB setting-----------------------------------
+"To create a new tab
+"nnoremap <C-t> :tabnew<Enter>
+"inoremap <C-t> <Esc>:tabnew<Space>
+nnoremap tn  :tabnew<Enter>
+nnoremap tj  :tabnext<Enter>
+nnoremap tk  :tabprev<Enter>
+"----------------------CtrlP setting-----------------------------------
 let g:vim_tags_auto_generate = 1
 let g:ctrlp_map = '<c-p>'
 let g:ctrlp_cmd = 'CtrlP'
@@ -57,4 +60,21 @@ let g:ctrlp_custom_ignore = {
     \ 'AcceptSelection("e")': ['<2-LeftMouse>'],
     \ 'AcceptSelection("t")': ['<cr>'],
     \ }
-  
+"----------------------Tag_list setting-----------------------------------
+"nnoremap <silent> <F8> :TlistOpen<CR>
+nnoremap <silent> <F8> :TlistToggle<CR>
+nnoremap <silent> <F9> :TlistShowPrototype<CR>
+" actionscript language
+let tlist_actionscript_settings = 'actionscript;c:class;f:method;p:property;v:variable'
+let tlist_tex_settings   = 'latex;s:sections;g:graphics;l:labels'
+let tlist_make_settings  = 'make;m:makros;t:targets'
+let Tlist_Use_Right_Window = 1
+let Tlist_WinWidth = 50
+let Tlist_Use_SingleClick = 1
+"let Tlist_Show_One_File = 1
+"let Tlist_Display_Prototype = 1
+"let Tlist_Process_File_Always = 1
+:set statusline=%<%f%=%([%{Tlist_Get_Tagname_By_Line()}]%)
+"----------------------Explore in Vim-----------------------------------
+"let g:netrw_liststyle = 3
+let g:netrw_banner = 0

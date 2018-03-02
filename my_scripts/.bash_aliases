@@ -6,7 +6,7 @@
 #
 #************export*************
 # machine_type=mmlk # zsb2z
-export MACHINE_TYPE=zse3
+export MACHINE_TYPE=zsze3
 export ACTION=act2
 export QT_VERSION=q530
 export MASTER_BRANCH=master
@@ -17,7 +17,7 @@ export KM=$KM3/KM
 export BUILD_SOURCE=${KM}/application
 export KM_WORK=${KM}/work
 export logFolder=$KM/work/${MACHINE_TYPE}/log
-export REPO_NAME=IT5_42_ZeusS_ZX0_SIM
+export REPO_NAME=IT6_Dev_1
 export REPO_PATH=$WORK/git/${REPO_NAME}
 
 git config --global push.default current

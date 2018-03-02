@@ -1,5 +1,8 @@
 MAC NETWORK: 080027173B14
-if [ -f ~/.bash_aliases ]; then  . ~/.bash_aliases;fi
+[[ -z "$MYALIASE" ]] && export MYALIASE=TRUE
+if [[ -f /root/.bash_aliases && "$MYALIASE" == "TRUE" ]]; then
+   . /root/.bash_aliases
+fi
 
 ## Setup on Windows 10
 # Fix virtual box
@@ -15,6 +18,7 @@ copy \\192.168.106.167\08_Software\MSCOMCTL\mscomctl.ocx to C:\Windows\SysWOW64\
 git@192.168.106.23:/root/work/git/IT5_42_New_2PortLan.git
 git@192.168.106.23:/root/work/git/IT6_Dev.git
 
+## Config Network on Fedora
 ## Setup on Ubuntu 64bit (Ubuntu 16.04.1 LTS newsim64 tty1)
 # Config NETWORK
 1. vi /etc/network/interfaces
@@ -37,6 +41,7 @@ sudo vi /etc/default/locale
 	LC_TELEPHONE="en_US.Shift-JIS"
 	LC_MEASUREMENT="en_US.Shift-JIS"
 	LC_IDENTIFICATION="en_US.Shift-JIS"
+echo $LANG # show current setting
 
 sudo vi ~/.pam_environment
 LANG=en_US
@@ -46,7 +51,7 @@ LANGUAGE=en_US
 "Setup for display Japan
 In the terminal setup: Kanji (receive) = SJIS ; Kanji (transmit) = SJIS; locale Japanese
 In ~/.vimrc : set encoding=sjis
-"Install plugin
+#Install plugin
 rpm -Uvh ~/.vim/ctags-5.5.4-1.i386.rpm
 dpkg -i ~/.vim/exuberant-ctags_5.9_svn20110310-11_i386.deb
 https://pkgs.org/download/ctags

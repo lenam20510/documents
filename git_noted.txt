@@ -10,6 +10,7 @@ git checkout -- mfp/ # Reset
 #git tag
 git tag -a Task_No52_RC_02 -m "Updated as customer's request"
 
+
 # create new repositoy
 adduser -m git
 chmod 757 /root
