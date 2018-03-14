@@ -52,6 +52,7 @@ function sgrep {
 	options=
 	includes=
 	pattern="$1"
+	exclude_dir=
 	is_multi=
 	shift
 	
@@ -108,6 +109,7 @@ function sfind {
 		shift
 	done
 	[[ "$pattern" != *"."* ]] && pattern=${pattern}*
+	echo "find $path -type f ${options} -iname *${pattern} ${notInclude} "
 	find $path -type f ${options} -iname *${pattern} \
 		${notInclude} \
 		|  head | grep --color=auto '^\|[^/]*$' #color

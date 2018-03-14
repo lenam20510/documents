@@ -7,6 +7,7 @@ PARAMS=$@
 CURR_DIR=`pwd`
 EXTEN_FILES='-name *.h -o -name *.cpp -o -name Makefile -o -name MediaMapFile*'
 REPO_PATH_TO_APP=application
+FileInCommonAPI=${WORK}/listFileInCommonAPI.txt
 # action=act2
 # machine_type=zsb2z
 # machine_type=zse3
@@ -159,25 +160,24 @@ function Create_UT {
 }
 
 function extract_source {
-
-	analysis_Revision $1 $2
+	revision_begin=$1
+	revision_end=$2
+	analysis_Revision $revision_begin $revision_end
 	
 	echo "------------------- $revision_begin:$revision_end ------------------------"
 	cd ${REPO_PATH}
 	local branch=`git rev-parse --abbrev-ref HEAD`
-	des_folder=${WORK}"/extract_source/`date +%F_%H%M%S`_${branch}_${revision_begin}_${revision_end}"
+	# des_folder=${WORK}"/extract_source/`date +%F_%H%M%S`_${branch}_${revision_begin}_${revision_end}"
+	des_folder=${WORK}"/extract_source/${branch}-${revision_begin}-${revision_end}-`date +%F`"
 	mkdir -p $des_folder
 	rm -rf $des_folder/*
 	file_diff_name_only=$des_folder/file_diff_name_only.txt
 	file_diff=$des_folder/diff_${revision_begin}_${revision_end}.patch
 	old_folder=$des_folder/old
 	new_folder=$des_folder/new
-	opa_folder=$des_folder/opa
 	# Cleanup & create destination folder.
 	mkdir -p $old_folder
 	mkdir -p $new_folder
-	#cp opa
-	# mkdir -p $opa_folder
 
 	# This is one-line command to get list file from "revision_begin" to "revision_end".
 	# And, perform copying changed files to new location by keep folder structure same as source file.
@@ -227,9 +227,14 @@ function updateSource {
 	echo "-->Updating source..."
 	local fileUpdateSource=${logFolder}/fileUpdateSource-${start_time}.txt
 
-	# arr_upSource=(mfp divlib/client/Proxy divlib/server)
-	arr_upSource=(mfp divlib/client/Proxy/system/ divlib/server/Stub)
+	arr_upSource=(mfp divlib/client/Proxy/system divlib/server/Stub)
+	# arr_upSource=(mfp divlib/client/Proxy/system/ divlib/server/Stub)
 	# arr_upSource=(mfp divlib)
+	case ${ACTION} in
+		divact2) arr_upSource=(divlib/client/Proxy/system/ divlib/server/Stub);;
+		mfpact2) arr_upSource=(mfp);;
+		*) ;;
+	esac
 	ops_find='-name "*.h" -o  -name "*.cpp" -o -name Makefile'
 	touch ${fileUpdateSource}
 	echo fileUpdateSource:$fileUpdateSource
@@ -244,6 +249,7 @@ function updateSource {
 	
 	for path in ${arr_upSource[*]}
 	do
+		echo *********$path*********
 		files=`find $path/* -type f ${EXTEN_FILES}`
 		for file in ${files[*]}
 		do
@@ -321,7 +327,8 @@ function startBuild {
 			errors=`egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}`
 			echo "$errors"
 			if [[ -n "$errors" && "$errors" == *"error:"* ]]; then
-				echo "`grep -n -B5 -A5 --color=always "error:" ${build_log}`" > $error_log &
+				# echo "`grep -n -B5 -A5 --color=always "error:" ${build_log}`" > $error_log &
+				echo "`grep -n --color=always "error:" ${build_log}`" > $error_log &
 			fi
 			echo
 		fi
@@ -350,6 +357,45 @@ function addMoreFiles {
 		fi
 	done < $file
 	cd $CURR_DIR
+}
+
+function findInCommonAPI {
+	FOLDER_LIST=/root/work/folder_list.txt
+	FILE_LIST=/root/work/file_list.txt
+	pattern=$1
+	is_file=
+	[[ "$pattern" == *".cpp" || "$pattern" == *".h" ]] && is_file=True
+	FILENAME=${pattern}-${start_time}.txt
+	OUTPUT=/root/work/findCommonAPI; mkdir -p $OUTPUT
+	OUTPUT_FILE=${OUTPUT}/${FILENAME}
+# FileInCommonAPI
+	echo > $OUTPUT_FILE
+	list_file=`cat ${FileInCommonAPI}`
+	file_pattern=${WORK}/list_pattern.txt
+	# Search in a target file.
+	# while IFS= read -r line
+	# do
+		# line=`echo $line | xargs`
+		# echo "*************************************"
+		# echo "$list_file" | grep --color=auto $line
+	# done < $file_pattern
+	
+	
+	if [[ -n $is_file ]]; then
+		echo "$list_file" | grep -i --color=auto $pattern 
+	else
+		cd ${WORK}
+		for fld in $list_file
+		do
+			if [ -f $fld ]; then
+				grep -nHi --color=always ${pattern} $fld | tee -a $OUTPUT_FILE
+			fi
+		done
+		cd $CURR_DIR
+	fi
+	
+	[[ -z $is_file ]] && echo '\\'${SIM_IPaddress}${OUTPUT_FILE} | sed  -e 's/\//\\/g'
+	
 }
 
 function startMFP {
@@ -394,6 +440,8 @@ elif [[ "$1" == "-cmp" ]]; then
 	compareFolder $2 $3 $4
 elif [[ "$1" == "-smfp" ]]; then
 	startMFP
+elif [[ "$1" == "-fcom" ]]; then
+	findInCommonAPI $2 $3
 else #Start build
 	while [[ -n "$1" ]]; do
 		if [[ "$1" == "-a" ]]; then

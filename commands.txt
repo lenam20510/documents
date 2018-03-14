@@ -82,7 +82,7 @@ gT            go to previous tab
 ##----------------Tag List---------------------------
 :TlistOpen
 :TlistToggle
- <enter> : Jump to tag definition                                                                                                                                                                                                      |
+<enter> : Jump to tag definition                                                                                                                                                                                                      |
 o : Jump to tag definition in new window                                                                                                                                                                                              |@
 p : Preview the tag definition                                                                                                                                                                                                        |@
 <space> : Display tag prototype                                                                                                                                                                                                       |@

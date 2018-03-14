@@ -9,6 +9,7 @@ git checkout -- mfp/ # Reset
 
 #git tag
 git tag -a Task_No52_RC_02 -m "Updated as customer's request"
+git tag -d Task_Eagle_RQ_591_RC_01
 
 
 # create new repositoy
