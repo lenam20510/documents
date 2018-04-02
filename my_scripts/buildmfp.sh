@@ -17,6 +17,7 @@ FileInCommonAPI=${WORK}/listFileInCommonAPI.txt
 # [ -n ${REPO_NAME} ] && repo_name=${REPO_NAME}
 # [ -n ${MACHINE_TYPE} ] && machine_type=${MACHINE_TYPE}
 
+
 function Help() {
 	echo "     Copy buildmfp.sh to /root/work folder"
 	echo "        Usage:"
@@ -93,6 +94,53 @@ function strip {
     echo "${STRING%$"$2"}"
 }
 
+function getFunNameAtLine {
+	local fileName=$1
+	local lineNumber=$2
+	local contents=$3 # No need
+	local ret=
+	[[ ! -f $fileName || -z $lineNumber ]] && return
+	# if [[ "$contents" == $"void"* || "$contents" == $"int"* ]] \
+		# || [[ "$contents" == *"::"* && "$contents" != *"newInstance"* && "$contents" == *"("* ]]
+		# ;then
+		# echo "$contents" | cut -d '(' -f1 | awk '{print $NF}'
+	# else
+		# checkNumber $lineNumber
+		# [ $? -ne 0 ] && return
+		content=`sed -n 1,${lineNumber}p < ${fileName}`
+		content=`echo "$content" | grep -n -e ^'{' -e ^'}' `
+		check=`echo "$content" | tail -n1`
+		# echo "$check"
+		if [[ -z $check || "$check" == *"}"* ]]; then
+			ret="<global>"
+		else
+			lineStartFunc=`echo $check | cut -d ':' -f1` # Get number
+			checkNumber $lineStartFunc
+			[ $? -ne 0 ] && return
+			ret=`sed -n $((${lineStartFunc}-1))p < ${fileName}`
+			if [[ "$ret" != *"("* && "$ret" != $"class"* && "$ret" != $"struct"* ]]; then
+				ret=`sed -n 1,$((${lineStartFunc}-1))p < ${fileName}`
+				ret=`echo "$ret" | grep -n '(' | tail -n1`
+			fi
+		fi
+		# echo ret:$ret
+		case ${ret} in
+			'<global>') echo $ret;;
+			"class"*|"struct"*) echo $ret | awk '{print $2}';;
+			*"("* )	echo "$ret" | cut -d '(' -f1 | awk '{print $NF}';;
+			*)
+				echo "$ret" | awk '{print $NF}';;
+		esac
+	# fi
+}
+
+function checkNumber {
+	case $1 in
+    ''|*[!0-9]*) return 1 ;; #echo bad 
+    *) return 0 ;; #echo good
+	esac
+}
+
 function Create_UT {
 	echo "Creating UT Spec... "
 	analysis_Revision all
@@ -152,8 +200,8 @@ function Create_UT {
 	sed -i "s/${REPO_PATH_TO_APP}//g" ${file_UT} # remove path to application
 	echo 
 	echo branch:$branch
-	echo '\\'${SIM_IPaddress}${file_diff} | sed  -e 's/\//\\/g'
-	echo '\\'${SIM_IPaddress}${file_UT} | sed  -e 's/\//\\/g'
+	showFile $file_diff
+	showFile $file_UT
 	# tr -d "\n\r" < ${file_UT}
 	cd $CURR_DIR
 	# rm -f $file_diff_tmp
@@ -168,7 +216,7 @@ function extract_source {
 	cd ${REPO_PATH}
 	local branch=`git rev-parse --abbrev-ref HEAD`
 	# des_folder=${WORK}"/extract_source/`date +%F_%H%M%S`_${branch}_${revision_begin}_${revision_end}"
-	des_folder=${WORK}"/extract_source/${branch}-${revision_begin}-${revision_end}-`date +%F`"
+	des_folder=${WORK}"/extract_source/${branch}-${revision_begin}-${revision_end}-`date +%F_%H%M%S`"
 	mkdir -p $des_folder
 	rm -rf $des_folder/*
 	file_diff_name_only=$des_folder/file_diff_name_only.txt
@@ -212,7 +260,7 @@ function extract_source {
 	# tree $new_folder
 	# Show tree new_folder
 	echo
-	echo '\\'${SIM_IPaddress}${des_folder} | sed  -e 's/\//\\/g'
+	showFile ${des_folder}
 	cd ${des_folder}
 	find ./new | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"
 	addedLine=`diff -r old new | grep "> " | wc -l`
@@ -359,43 +407,119 @@ function addMoreFiles {
 	cd $CURR_DIR
 }
 
+# -all	:	search in application		deafaut:In CommonAPI
+# -sf		:	Show Function Name	default: No
+# -sn		:	Show number line	default: No
+# -sc		:	Show in CommonAPI	default: No
+# -f		: 	Find NameFile in CommonAPI or Not	default: No
 function findInCommonAPI {
-	FOLDER_LIST=/root/work/folder_list.txt
-	FILE_LIST=/root/work/file_list.txt
-	pattern=$1
+	echo $@
+	pattern=
 	is_file=
-	[[ "$pattern" == *".cpp" || "$pattern" == *".h" ]] && is_file=True
-	FILENAME=${pattern}-${start_time}.txt
-	OUTPUT=/root/work/findCommonAPI; mkdir -p $OUTPUT
-	OUTPUT_FILE=${OUTPUT}/${FILENAME}
-# FileInCommonAPI
-	echo > $OUTPUT_FILE
-	list_file=`cat ${FileInCommonAPI}`
+	is_all=
+	is_ShowFunc=
+	is_ShowNumber=
+	is_ShowCommon=
+	InCommon=
+	while [[ -n "$1" ]]; do
+		if [[ "$1" == "-all" ]]; then
+			is_all=True
+		elif [[ "$1" == "-f" ]]; then
+			is_file=True
+			shift
+			pattern=$1
+		elif [[ "$1" == "-sf" ]]; then
+			is_ShowFunc=True
+		elif [[ "$1" == "-sn" ]]; then
+			is_ShowNumber=True
+		elif [[ "$1" == "-sc" ]]; then
+			is_ShowCommon=True
+		else
+			pattern=$1
+		fi	
+		shift
+	done
+	fileInCommon=`cat ${FileInCommonAPI}`
 	file_pattern=${WORK}/list_pattern.txt
-	# Search in a target file.
-	# while IFS= read -r line
-	# do
-		# line=`echo $line | xargs`
-		# echo "*************************************"
-		# echo "$list_file" | grep --color=auto $line
-	# done < $file_pattern
 	
-	
-	if [[ -n $is_file ]]; then
-		echo "$list_file" | grep -i --color=auto $pattern 
+	if [[ -n $is_file ]]; then # Search file name in CommonAPI
+		if [[ "$pattern" != *".txt"  ]]; then
+			echo "$fileInCommon" | grep -i --color=auto $pattern
+		else
+			# Search in a target file.
+			while IFS= read -r line
+			do
+				line=`echo $line | xargs`
+				file_name=$(basename "${line}")
+				echo "*************************************"
+				echo "$fileInCommon" | grep --color=auto $file_name #| tee -a $output_file
+			done < $pattern
+			# showFile $output_file
+		fi
 	else
-		cd ${WORK}
-		for fld in $list_file
-		do
-			if [ -f $fld ]; then
-				grep -nHi --color=always ${pattern} $fld | tee -a $OUTPUT_FILE
-			fi
-		done
+		count=0
+		FILENAME=${pattern}-`date +%F`.txt
+		OUTPUT=/root/work/findCommonAPI; mkdir -p $OUTPUT
+		tmp_file=${OUTPUT}/${pattern}.txt; echo >$tmp_file
+		output_file=${OUTPUT}/${FILENAME}; echo >$output_file
+		cd ${BUILD_SOURCE}
+		if [[ -n $is_all ]]; then
+				grep -rna --include=*.h --include=*.cpp --include=*.c --include=MediaMapFile* --exclude=*.bak --exclude=*.class --exclude=*.o --exclude=*.swp ${pattern} * > $tmp_file
+		else
+			InCommon=True
+			for fld in $fileInCommon
+			do
+				if [ -f $fld ]; then
+					grep -nHi ${pattern} $fld >> $tmp_file
+				fi
+			done
+		fi
 		cd $CURR_DIR
+		
+		if [[ -n $is_ShowFunc || -n $is_ShowNumber || -n $is_ShowCommon ]]; then
+			while IFS= read -r line 
+			do
+				funName=
+				result=
+				[[ -z $line ]] && continue
+				fileName=`echo $line | cut -d ':' -f1`
+				lineNumber=`echo $line | cut -d ':' -f2`
+				content=`echo $line | cut -d ':' -f3-`
+				if [[ -n ${fileName} && -n ${lineNumber} ]]; then
+					funName=$(getFunNameAtLine ${BUILD_SOURCE}/${fileName} ${lineNumber} "${content}")
+					[[ -z $funName ]] && funName="<global>"
+					if [[ -n $is_ShowCommon ]]; then
+						b_IsCommon=o
+						if [[ -z $InCommon ]]; then
+							echo "$fileInCommon" | grep -i $fileName > /dev/null
+							[ $? -ne 0 ] && b_IsCommon=x
+						fi
+						result="${b_IsCommon}"
+					fi
+					result+="	${fileName}"
+					[[ -n $is_ShowNumber ]] && result+="	${lineNumber}"
+					[[ -n $is_ShowFunc ]] && result+="	${funName}"
+					result+="	${content}"
+					echo "$result" >> $output_file
+				else
+					echo "FAILDDDDDDDDDDDDDDDDDDDDDDDDDD:$line" >> $output_file
+				fi
+			done < $tmp_file
+		else
+			output_file=$tmp_file
+		fi
+		grep --color=always ${pattern} $output_file #show results into the terminal.
+		sed -i 's/\r//g'  ${output_file} # remove CR
+		# rm -f $tmp_file
+		showFile $output_file
+		echo Count: `grep -c ${pattern} $output_file `
 	fi
 	
-	[[ -z $is_file ]] && echo '\\'${SIM_IPaddress}${OUTPUT_FILE} | sed  -e 's/\//\\/g'
-	
+}
+
+function showFile {
+	echo 
+	echo '\\'${SIM_IPaddress}${1} | sed  -e 's/\//\\/g'
 }
 
 function startMFP {
@@ -440,8 +564,10 @@ elif [[ "$1" == "-cmp" ]]; then
 	compareFolder $2 $3 $4
 elif [[ "$1" == "-smfp" ]]; then
 	startMFP
+elif [[ "$1" == "-gf" ]]; then
+	getFunNameAtLine $2 $3
 elif [[ "$1" == "-fcom" ]]; then
-	findInCommonAPI $2 $3
+	findInCommonAPI $@
 else #Start build
 	while [[ -n "$1" ]]; do
 		if [[ "$1" == "-a" ]]; then

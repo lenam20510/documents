@@ -19,6 +19,8 @@ export KM_WORK=${KM}/work
 export logFolder=$KM/work/${MACHINE_TYPE}/log
 export REPO_NAME=IT6_Dev_1
 export REPO_PATH=$WORK/git/${REPO_NAME}
+export CSCOPE_DB=cscope.out
+export CSCOPE_EDITOR=vim
 
 git config --global push.default current
 git config --global color.ui true

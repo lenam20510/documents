@@ -33,3 +33,7 @@ ctrl+wv - Split windows vertically
                                    the cursor
 |CTRL-W_f|      CTRL-W f           split window and edit file name under the
                                    cursor
+##----------------Cscope---------------------------
+CTRL-D to exit Cscope.
+CTRL-t" to jump back to your original location.
+tab to continue search

@@ -14,9 +14,11 @@ Administative->Change system locale->select Japan
 # Fix script of excel
 copy \\192.168.106.167\08_Software\MSCOMCTL\mscomctl.ocx to C:\Windows\SysWOW64\mscomctl.ocx
 
-# -----------------------------------------------------------
+# --------------------git---------------------------------------
 git@192.168.106.23:/root/work/git/IT5_42_New_2PortLan.git
 git@192.168.106.23:/root/work/git/IT6_Dev.git
+#Fixed issues related to that can't push
+cd path/to/repository; sudo chmod 777 -R objects
 
 ## Config Network on Fedora
 ## Setup on Ubuntu 64bit (Ubuntu 16.04.1 LTS newsim64 tty1)
@@ -55,3 +57,9 @@ In ~/.vimrc : set encoding=sjis
 rpm -Uvh ~/.vim/ctags-5.5.4-1.i386.rpm
 dpkg -i ~/.vim/exuberant-ctags_5.9_svn20110310-11_i386.deb
 https://pkgs.org/download/ctags
+#Install plugin cscope
+tar -xvf ~/.vim/cscope-15.8b.tar.gz
+cd cscope-15.8b
+./configure; export LDFLAGS="$LDFLAGS -ltinfo"; make; make install
+#go to root dirctory of source
+find mfp/ divlib/ -type f -name *.h -o -name *.cpp -o -name *.c | sort -u > cscope.files; cscope -bv
