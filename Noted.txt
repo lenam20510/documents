@@ -1,4 +1,4 @@
-MAC NETWORK: 080027173B14
+﻿MAC NETWORK: 080027173B14
 [[ -z "$MYALIASE" ]] && export MYALIASE=TRUE
 if [[ -f /root/.bash_aliases && "$MYALIASE" == "TRUE" ]]; then
    . /root/.bash_aliases
@@ -22,13 +22,18 @@ cd path/to/repository; sudo chmod 777 -R objects
 
 ## Config Network on Fedora
 ## Setup on Ubuntu 64bit (Ubuntu 16.04.1 LTS newsim64 tty1)
+# Install vboxsf plugin
+CURR_DIR=`pwd`;cd /root/work/;mkdir cdroom;mount /dev/cdrom cdroom;cd cdroom;./VBoxLinuxAdditions.run;cd $CURR_DIR
+mkdir -p /root/work/receive_document ;mount -t vboxsf receive_document /root/work/receive_document 
 # Config NETWORK
 1. vi /etc/network/interfaces
-	auto eth2
-	iface eth2 inet dhcp
+auto eth2
+#iface eth2 inet dhcp
+iface eth2 inet static
+address 192.168.106.150
 2. sudo /etc/init.d/networking restart
 # Change language for Ubuntu
-sudo vi /etc/default/locale
+vi /etc/default/locale
 LANG="en_US.Shift-JIS"
 LANGUAGE="en_US.Shift-JIS"
 LC_CTYPE="en_US.Shift-JIS"
@@ -45,7 +50,7 @@ LC_MEASUREMENT="en_US.Shift-JIS"
 LC_IDENTIFICATION="en_US.Shift-JIS"
 echo $LANG # show current setting
 
-sudo vi ~/.pam_environment
+vi ~/.pam_environment
 LANG=en_US
 LANGUAGE=en_US
 
@@ -62,4 +67,4 @@ tar -xvf ~/.vim/cscope-15.8b.tar.gz
 cd cscope-15.8b
 ./configure; export LDFLAGS="$LDFLAGS -ltinfo"; make; make install
 #go to root dirctory of source
-find mfp/ divlib/ -type f -name *.h -o -name *.cpp -o -name *.c | sort -u > cscope.files; cscope -bv
+find mfp/ divlib/ -type f -name *.h -o -name *.cpp -o -name *.c | sort -u > cscope.files; cscope -bv; ctags -R mfp/* divlib/*

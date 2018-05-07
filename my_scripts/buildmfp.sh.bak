@@ -7,6 +7,7 @@ PARAMS=$@
 CURR_DIR=`pwd`
 EXTEN_FILES='-name *.h -o -name *.cpp -o -name Makefile -o -name MediaMapFile*'
 REPO_PATH_TO_APP=application
+FileInCommonAPI=${WORK}/listFileInCommonAPI.txt
 # action=act2
 # machine_type=zsb2z
 # machine_type=zse3
@@ -15,6 +16,7 @@ REPO_PATH_TO_APP=application
 # machine_type=${MACHINE_TYPE}
 # [ -n ${REPO_NAME} ] && repo_name=${REPO_NAME}
 # [ -n ${MACHINE_TYPE} ] && machine_type=${MACHINE_TYPE}
+
 
 function Help() {
 	echo "     Copy buildmfp.sh to /root/work folder"
@@ -92,6 +94,52 @@ function strip {
     echo "${STRING%$"$2"}"
 }
 
+function getFunNameAtLine {
+	local fileName=$1
+	local lineNumber=$2
+	local contents=$3 # No need
+	local ret=
+	[[ ! -f $fileName || -z $lineNumber ]] && return
+	# if [[ "$contents" == $"void"* || "$contents" == $"int"* ]] \
+		# || [[ "$contents" == *"::"* && "$contents" != *"newInstance"* && "$contents" == *"("* ]]
+		# ;then
+		# echo "$contents" | cut -d '(' -f1 | awk '{print $NF}'
+	# else
+		# checkNumber $lineNumber
+		# [ $? -ne 0 ] && return
+		content=`sed -n 1,${lineNumber}p < ${fileName}`
+		content=`echo "$content" | grep -na -e ^'{' -e ^'}' `
+		check=`echo "$content" | tail -n1`
+		if [[ -z $check || "$check" == *"}"* ]]; then
+			ret="<global>"
+		else
+			lineStartFunc=`echo $check | cut -d ':' -f1` # Get number
+			checkNumber $lineStartFunc
+			[ $? -ne 0 ] && return
+			ret=`sed -n $((${lineStartFunc}-1))p < ${fileName}`
+			if [[ "$ret" != *"("* && "$ret" != $"class"* && "$ret" != $"struct"* ]]; then
+				ret=`sed -n 1,$((${lineStartFunc}-1))p < ${fileName}`
+				ret=`echo "$ret" | grep -na '(' | tail -n1`
+			fi
+		fi
+		# echo ret:$ret
+		case ${ret} in
+			'<global>') echo $ret;;
+			"class"*|"struct"*) echo $ret | awk '{print $2}';;
+			*"("* )	echo "$ret" | cut -d '(' -f1 | awk '{print $NF}';;
+			*)
+				echo "$ret" | awk '{print $NF}';;
+		esac
+	# fi
+}
+
+function checkNumber {
+	case $1 in
+    ''|*[!0-9]*) return 1 ;; #echo bad 
+    *) return 0 ;; #echo good
+	esac
+}
+
 function Create_UT {
 	echo "Creating UT Spec... "
 	analysis_Revision all
@@ -151,33 +199,32 @@ function Create_UT {
 	sed -i "s/${REPO_PATH_TO_APP}//g" ${file_UT} # remove path to application
 	echo 
 	echo branch:$branch
-	echo '\\'${SIM_IPaddress}${file_diff} | sed  -e 's/\//\\/g'
-	echo '\\'${SIM_IPaddress}${file_UT} | sed  -e 's/\//\\/g'
+	showFile $file_diff
+	showFile $file_UT
 	# tr -d "\n\r" < ${file_UT}
 	cd $CURR_DIR
 	# rm -f $file_diff_tmp
 }
 
 function extract_source {
-
-	analysis_Revision $1 $2
+	revision_begin=$1
+	revision_end=$2
+	analysis_Revision $revision_begin $revision_end
 	
 	echo "------------------- $revision_begin:$revision_end ------------------------"
 	cd ${REPO_PATH}
 	local branch=`git rev-parse --abbrev-ref HEAD`
-	des_folder=${WORK}"/extract_source/`date +%F_%H%M%S`_${branch}_${revision_begin}_${revision_end}"
+	# des_folder=${WORK}"/extract_source/`date +%F_%H%M%S`_${branch}_${revision_begin}_${revision_end}"
+	des_folder=${WORK}"/extract_source/${branch}-${revision_begin}-${revision_end}-`date +%F_%H%M%S`"
 	mkdir -p $des_folder
 	rm -rf $des_folder/*
 	file_diff_name_only=$des_folder/file_diff_name_only.txt
 	file_diff=$des_folder/diff_${revision_begin}_${revision_end}.patch
 	old_folder=$des_folder/old
 	new_folder=$des_folder/new
-	opa_folder=$des_folder/opa
 	# Cleanup & create destination folder.
 	mkdir -p $old_folder
 	mkdir -p $new_folder
-	#cp opa
-	# mkdir -p $opa_folder
 
 	# This is one-line command to get list file from "revision_begin" to "revision_end".
 	# And, perform copying changed files to new location by keep folder structure same as source file.
@@ -188,10 +235,12 @@ function extract_source {
 	# git diff $revision_begin $revision_end --name-only | 
 	while read line
 	do
+		is_FailCommit=
 		dir_name_file=$(dirname "${line}")
 		mkdir -p $old_folder/$dir_name_file
 		git show ${revision_begin}:$line > $old_folder/$line
 		if [ $? -ne 0 ]; then # If having a error, we will find first commit of this file.
+			is_FailCommit=True
 			first_commit_line=$(git log --diff-filter=A -- ${line} | head -n1 | cut -d ' ' -f2)
 			echo "first_commit_line:${first_commit_line}"
 			rm -f $old_folder/$line
@@ -204,15 +253,25 @@ function extract_source {
 		else
 			cp $line $new_folder/$line
 		fi
+		
+		if [[ "$is_FailCommit" == "True" ]]; then
+			# Checking again
+			`cmp --silent $new_folder/$line $old_folder/$line`
+			if [ $? -eq 0 ]; then
+				# The same, so remove it
+				echo "Both file is the same. Remove it"
+				rm -f $new_folder/$line $old_folder/$line
+			fi
+		fi
 		# cp --parents ${REPO_PATH}/$line $new_folder
-		# cp --parents $ORIGINAL_SOURCE/KM3/KM/application/$line $old_folder
+		# cp --parents $ORIGINAL_SOURCE/KM3/$line $old_folder
 	done < "$file_diff_name_only"
 	# Create_UT $file_diff
 	# tree $old_folder
 	# tree $new_folder
 	# Show tree new_folder
 	echo
-	echo '\\'${SIM_IPaddress}${des_folder} | sed  -e 's/\//\\/g'
+	showFile ${des_folder}
 	cd ${des_folder}
 	find ./new | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"
 	addedLine=`diff -r old new | grep "> " | wc -l`
@@ -227,9 +286,14 @@ function updateSource {
 	echo "-->Updating source..."
 	local fileUpdateSource=${logFolder}/fileUpdateSource-${start_time}.txt
 
-	# arr_upSource=(mfp divlib/client/Proxy divlib/server)
-	arr_upSource=(mfp divlib/client/Proxy/system/ divlib/client/Proxy/nicfum divlib/server/Stub)
+	arr_upSource=(mfp divlib/client/Proxy/system divlib/server/Stub)
+	# arr_upSource=(mfp divlib/client/Proxy/system/ divlib/server/Stub)
 	# arr_upSource=(mfp divlib)
+	case ${ACTION} in
+		divact2) arr_upSource=(divlib/client/Proxy/system/ divlib/server/Stub);;
+		mfpact2) arr_upSource=(mfp);;
+		*) ;;
+	esac
 	ops_find='-name "*.h" -o  -name "*.cpp" -o -name Makefile'
 	touch ${fileUpdateSource}
 	echo fileUpdateSource:$fileUpdateSource
@@ -244,6 +308,7 @@ function updateSource {
 	
 	for path in ${arr_upSource[*]}
 	do
+		echo *********$path*********
 		files=`find $path/* -type f ${EXTEN_FILES}`
 		for file in ${files[*]}
 		do
@@ -253,9 +318,10 @@ function updateSource {
 			if [ $? -ne 0 ]; then
 				echo $file $file_build_sour | tee -a $fileUpdateSource
 				dirname_file_build_sour=$(dirname "${file_build_sour}")
-				mkdir -p $dirname_file_build_sour
-				yes | cp -f $file $file_build_sour
-				touch $file_build_sour
+				# echo "Don't copy $file"
+				# mkdir -p $dirname_file_build_sour
+				# yes | cp -f $file $file_build_sour
+				# touch $file_build_sour
 			fi
 		done
 	done
@@ -321,7 +387,8 @@ function startBuild {
 			errors=`egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}`
 			echo "$errors"
 			if [[ -n "$errors" && "$errors" == *"error:"* ]]; then
-				echo "`grep -n -B5 -A5 --color=always "error:" ${build_log}`" > $error_log &
+				# echo "`grep -n -B5 -A5 --color=always "error:" ${build_log}`" > $error_log &
+				echo "`grep -n --color=always "error:" ${build_log}`" > $error_log &
 			fi
 			echo
 		fi
@@ -333,6 +400,9 @@ function startBuild {
 	exit 0
 }
 
+# $1: source folder
+# $2: destination folder
+# $3: list file
 function addMoreFiles {
 	local source="$1"
 	local destination="$2"
@@ -347,6 +417,125 @@ function addMoreFiles {
 		fi
 	done < $file
 	cd $CURR_DIR
+}
+
+# -all	:	search in application		deafaut:In CommonAPI
+# -sf		:	Show Function Name	default: No
+# -sn		:	Show number line	default: No
+# -sc		:	Show in CommonAPI	default: No
+# -f		: 	Find NameFile in CommonAPI or Not	default: No
+function findInCommonAPI {
+	echo $@
+	pattern=
+	is_file=
+	is_all=
+	is_ShowFunc=
+	is_ShowNumber=
+	is_ShowCommon=
+	InCommon=
+	while [[ -n "$1" ]]; do
+		if [[ "$1" == "-all" ]]; then
+			is_all=True
+		elif [[ "$1" == "-f" ]]; then
+			is_file=True
+			shift
+			pattern=$1
+		elif [[ "$1" == "-sf" ]]; then
+			is_ShowFunc=True
+		elif [[ "$1" == "-sn" ]]; then
+			is_ShowNumber=True
+		elif [[ "$1" == "-sc" ]]; then
+			is_ShowCommon=True
+		else
+			pattern=$1
+		fi	
+		shift
+	done
+	fileInCommon=`cat ${FileInCommonAPI}`
+	file_pattern=${WORK}/list_pattern.txt
+	
+	if [[ -n $is_file ]]; then # Search file name in CommonAPI
+		if [[ "$pattern" != *".txt"  ]]; then
+			echo "$fileInCommon" | grep -i --color=auto $pattern
+		else
+			# Search in a target file.
+			while IFS= read -r line
+			do
+				line=`echo $line | xargs`
+				file_name=$(basename "${line}")
+				echo "*************************************"
+				echo "$fileInCommon" | grep --color=auto $file_name #| tee -a $output_file
+			done < $pattern
+			# showFile $output_file
+		fi
+	else
+		count=0
+		FILENAME=${pattern}-`date +%F`.txt
+		OUTPUT=/root/work/findCommonAPI; mkdir -p $OUTPUT
+		tmp_file=${OUTPUT}/${pattern}.txt; echo >$tmp_file
+		output_file=${OUTPUT}/${FILENAME}; echo >$output_file
+		cd ${BUILD_SOURCE}
+		if [[ -n $is_all ]]; then
+				grep -rna --include=*.h --include=*.cpp --include=*.c --include=MediaMapFile* --exclude=*.bak --exclude=*.class --exclude=*.o --exclude=*.swp ${pattern} * > $tmp_file
+		else
+			InCommon=True
+			for fld in $fileInCommon
+			do
+				if [ -f $fld ]; then
+					grep -naHi ${pattern} $fld >> $tmp_file
+				fi
+			done
+		fi
+		cd $CURR_DIR
+		
+		if [[ -n $is_ShowFunc || -n $is_ShowNumber || -n $is_ShowCommon ]]; then
+			while IFS= read -r line 
+			do
+				funName=
+				result=
+				[[ -z $line ]] && continue
+				fileName=`echo $line | cut -d ':' -f1`
+				lineNumber=`echo $line | cut -d ':' -f2`
+				content=`echo $line | cut -d ':' -f3-`
+				# ignore if it's a comment.
+				echo $content | grep ^"//" > /dev/null
+				[[ $? -eq 0 ]] && echo isComment:$content && continue
+				if [[ -n ${fileName} && -n ${lineNumber} ]]; then
+					funName=$(getFunNameAtLine ${BUILD_SOURCE}/${fileName} ${lineNumber} "${content}")
+					[[ -z "$funName" ]] && funName="<global>"
+					if [[ -n $is_ShowCommon ]]; then
+						b_IsCommon=o
+						if [[ -z $InCommon ]]; then
+							echo "$fileInCommon" | grep -i $fileName > /dev/null
+							[ $? -ne 0 ] && b_IsCommon=x
+						fi
+						result="${b_IsCommon}"
+					fi
+					result+="	${fileName}"
+					[[ -n $is_ShowNumber ]] && result+="	${lineNumber}"
+					[[ -n $is_ShowFunc ]] && result+="	${funName}"
+					result+="	${content}"
+					echo "$result" >> $output_file
+				else
+					echo "FAILDDDDDDDDDDDDDDDDDDDDDDDDDD:$line" >> $output_file
+				fi
+			done < $tmp_file
+		else
+			output_file=$tmp_file
+		fi
+		grep -ai --color=always ${pattern} $output_file #show results into the terminal.
+		# cat $output_file
+		sed -i 's/\r//g'  ${output_file} # remove CR
+		# rm -f $tmp_file
+		showFile $output_file
+		echo Count: `grep -c ${pattern} $output_file `
+	fi
+	
+}
+
+function showFile {
+	echo 
+	echo '\\'${SIM_IPaddress}${1} | sed  -e 's/\//\\/g'
 }
 
 function startMFP {
@@ -391,6 +580,10 @@ elif [[ "$1" == "-cmp" ]]; then
 	compareFolder $2 $3 $4
 elif [[ "$1" == "-smfp" ]]; then
 	startMFP
+elif [[ "$1" == "-gf" ]]; then
+	getFunNameAtLine $2 $3
+elif [[ "$1" == "-fcom" ]]; then
+	findInCommonAPI $@
 else #Start build
 	while [[ -n "$1" ]]; do
 		if [[ "$1" == "-a" ]]; then

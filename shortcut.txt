@@ -37,3 +37,20 @@ ctrl+wv - Split windows vertically
 CTRL-D to exit Cscope.
 CTRL-t" to jump back to your original location.
 tab to continue search
+
+##----------------Sticky Notes---------------------------
+Bold: Ctrl+B
+Italics: Ctrl+I
+Underline: Ctrl+U
+Strikethrough: Ctrl+T
+Bullet list: Ctrl+Shift+L
+Increase size of text: Ctrl+Shift+>
+Decrease size of text: Ctrl+Shift+<
+See the options when you press Ctrl+Shift+L each time (1 to 5 times).eg. To get Roman numerals: Press 5 times, Ctrl+Shift+L.
+Capitalize (or otherwise) highlighted letters: Ctrl+Shift+A
+Right Align: Ctrl+R
+Center align: Ctrl+E
+Left Align: Ctrl+L
+Single line space: Ctrl+1
+Double line space: Ctrl+2
+1.5 line space: Ctrl+5

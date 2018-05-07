@@ -1,11 +1,15 @@
 #!/bin/bash
 # clear
+# PPID=$$
+# echo PPID:$PPID
 start=`date +%s`
 start_time=`date +%F_%H%M%S`
 #Default value:
+BASENAME=`basename "$0"`
+BASEDIR=`dirname $(readlink -f "$0")`
 PARAMS=$@
 CURR_DIR=`pwd`
-EXTEN_FILES='-name *.h -o -name *.cpp -o -name Makefile -o -name MediaMapFile*'
+EXTEN_FILES='-name *.h -o -name *.cpp -o -name Makefile -o -name MediaMapFile* -o -name *.txt'
 REPO_PATH_TO_APP=application
 FileInCommonAPI=${WORK}/listFileInCommonAPI.txt
 # action=act2
@@ -16,7 +20,46 @@ FileInCommonAPI=${WORK}/listFileInCommonAPI.txt
 # machine_type=${MACHINE_TYPE}
 # [ -n ${REPO_NAME} ] && repo_name=${REPO_NAME}
 # [ -n ${MACHINE_TYPE} ] && machine_type=${MACHINE_TYPE}
-
+COUNT_TRAP=0
+PID_PMAKE=
+killBuildProcess () {
+	# echo COUNT_TRAP:$COUNT_TRAP
+	# [ $COUNT_TRAP -gt 0 ] && exit 0
+	# COUNT_TRAP=$((COUNT_TRAP+1))
+	nameProcess=${1:-${GCC}}
+	while true; do
+		pid=
+		# ps -o comm,pid,uname -C xinit
+		# ps -o pid,cmd -C xinit  | awk '{print $1,$3,$NF;}' | grep --color=auto xinit
+		# ps -af | egrep -e i386-linux-gcc  | grep -v grep | awk '{print $2,$3,$8,$NF;}' > tmp
+		# pid=`ps -ef | grep -v grep | grep ^$nameProcess | grep ^'gcc' | grep -v .c$ | grep -v .cpp$ | awk '{print $2;}'`
+		# pid=`ps -o pid,cmd -C $nameProcess | awk '{print $1,$2,$3,$NF;}' | grep --color=auto $nameProcess`
+		# echo "$pid" | grep -q $nameProcess
+		pid=`ps -o time,pid,ppid,cmd --forest -g -p $(pgrep -x $BASENAME) | grep -v grep | grep $nameProcess`
+		if [[ $? -ne 0 ]]; then # || `ps -o pid,comm -C $PID_PMAKE | grep -v COMMAND` -ne 0
+			break
+		fi
+		# echo "${nameProcess} is being used. Please wait..."
+		echo "$pid" | awk '{print $2,$3,$7,$8,$9,$(NF-1),$NF}'
+		echo "--------------------------------------------"
+		# echo "$pid" | grep --color=auto $nameProcess | awk '{print $2,$3,$7,$(NF-1),$NF}'
+		sleep 3
+	done
+	# echo "$pid" | awk '{print $2,$3,$7,$(NF-1),$NF}'
+	# echo "Safe kill process!!"
+	killHardProcess
+}
+trap killHardProcess SIGINT
+killHardProcess() {
+	echo "killHardProcess!!!"
+	pids=$(pgrep $BASENAME | grep -v grep | grep -v $PPID)
+	for pid in $pids
+	do
+		echo $pid
+		kill -9 $pid&
+	done
+	exit 0
+}
 
 function Help() {
 	echo "     Copy buildmfp.sh to /root/work folder"
@@ -40,8 +83,9 @@ function backupLogs {
 	if [ $? -ne 0 ]; then
 		return
 	fi
+	mkdir -p ${logFolder}/old; mv ${logFolder}/'backup_log-'* ${logFolder}/old >/dev/null # Moving other backup-logs to old folder.
 	prefix=default-${start_time}
-	if [ -f $FILE_BRANCH ]; then
+	if [[ -f $FILE_BRANCH ]]; then
 		local branch=`cat $FILE_BRANCH`
 		[[ -n "$branch" ]] && prefix="$branch"
 	fi
@@ -94,6 +138,34 @@ function strip {
     echo "${STRING%$"$2"}"
 }
 
+function rmComment {
+	input=$1
+	output_comment=
+	input_tmp=/tmp/tmp_rmComment_input_$start_time.txt
+	echo "$input" > $input_tmp
+	output_tmp=/tmp/tmp_rmComment_output_$start_time.txt; echo >$output_tmp
+	# output=${input%%\/\/*}; echo "$output"
+	while IFS= read -r line
+	do
+		[[ -z  $line ]] && continue
+		output=${line%%\/\/*}; echo $output >> $output_tmp
+	done < $input_tmp
+	sed -i '/^\s*$/d' $output_tmp #remove empty line
+	output_comment=`cat $output_tmp`
+	# rm -f $input_tmp $output_tmp
+}
+
+function reverString {
+	input="$1"
+	reverse=""
+	len=${#input}
+	for (( i=$len-1; i>=0; i-- ))
+	do 
+		reverse="$reverse${input:$i:1}"
+	done
+	echo "$reverse"
+}
+
 function getFunNameAtLine {
 	local fileName=$1
 	local lineNumber=$2
@@ -108,9 +180,8 @@ function getFunNameAtLine {
 		# checkNumber $lineNumber
 		# [ $? -ne 0 ] && return
 		content=`sed -n 1,${lineNumber}p < ${fileName}`
-		content=`echo "$content" | grep -n -e ^'{' -e ^'}' `
+		content=`echo "$content" | grep -na -e ^'{' -e ^'}' `
 		check=`echo "$content" | tail -n1`
-		# echo "$check"
 		if [[ -z $check || "$check" == *"}"* ]]; then
 			ret="<global>"
 		else
@@ -118,12 +189,25 @@ function getFunNameAtLine {
 			checkNumber $lineStartFunc
 			[ $? -ne 0 ] && return
 			ret=`sed -n $((${lineStartFunc}-1))p < ${fileName}`
+			ret=${ret%%\/\/*}
+			# echo ret:$ret
 			if [[ "$ret" != *"("* && "$ret" != $"class"* && "$ret" != $"struct"* ]]; then
-				ret=`sed -n 1,$((${lineStartFunc}-1))p < ${fileName}`
-				ret=`echo "$ret" | grep -n '(' | tail -n1`
+				file_tmp=/tmp/tmp_getFunNameAtLine
+				getStart=`sed -n 1,$((${lineStartFunc}-1))p < ${fileName} | grep -a '('`
+				echo "$getStart" | tail -n20 > $file_tmp
+				tac $file_tmp > ${file_tmp}_out
+				while IFS= read -r line
+				do
+					ret=${line%%\/\/*}
+					# echo ret:$ret
+					[[ "$ret" == *'('* ]] && break
+				done < ${file_tmp}_out
 			fi
+			# if [[ "$ret" != *"("* && "$ret" != $"class"* && "$ret" != $"struct"* ]]; then
+				# ret=`sed -n 1,$((${lineStartFunc}-1))p < ${fileName}`
+				# ret=`echo "$ret" | grep -na '(' | tail -n1`
+			# fi
 		fi
-		# echo ret:$ret
 		case ${ret} in
 			'<global>') echo $ret;;
 			"class"*|"struct"*) echo $ret | awk '{print $2}';;
@@ -141,12 +225,38 @@ function checkNumber {
 	esac
 }
 
+function addDebugComt {
+	file_name=$1
+	content="$2"
+	cd $REPO_PATH
+	if [[ ! -f $file_name || -z $content ]]; then
+		echo Parameter input error. FAILED!!!
+	else
+		line_num=`echo $content | cut -d ',' -f1 | cut -d '-' -f2`
+		func_name=`echo $content | cut -d '(' -f1 | awk '{print $NF}'`
+		grep "${func_name}:${file_name}" $file_addDebug
+		[ $? -eq 0 ] && echo "Already existed" && return
+		getContent=`sed -n 1,${line_num}p < ${file_name} | grep -an -A5 ${func_name} | tail -n7 | grep -a '{' | head -n1`
+		index=`echo $getContent | cut -d '-' -f1`
+		[[ $(checkNumber $line_num) -ne 0 ]] && echo FAILDDDDDDDDDDDDDDDDDDDDDDDDDD && return
+		let index=$((index + 1))
+		echo "Adding a debug comment at $file_name:$index"
+		sed -i ${index}i'printf("addDebugComment %s_%s_%d\\n", __FILE__, __LINE__, __FUNCTION__);' $file_name
+		[ $? -ne 0 ] && echo Added FAILDDDDDDDDDDDDDDDDDDDDDDDDDD
+		unix2dos $file_name
+		echo "${func_name}:${file_name}" >> $file_addDebug
+	fi
+	cd $CURR_DIR
+}
+
 function Create_UT {
 	echo "Creating UT Spec... "
 	analysis_Revision all
 	cd ${REPO_PATH}
 	local branch=`git rev-parse --abbrev-ref HEAD`
 	echo
+	is_addDebug=$@
+	echo is_addDebug:$is_addDebug
 	fld_UT=$WORK/UT_Spec; mkdir -p $fld_UT
 	file_diff=$fld_UT/${branch}_${revision_begin}_${revision_end}.patch; echo >$file_diff
 	file_UT=$fld_UT/${branch}_${revision_begin}_${revision_end}.txt; rm -f $file_UT
@@ -166,6 +276,10 @@ function Create_UT {
 	# file_diff_tmp=~/work/tmp.txt
 	info_func=
 	file=
+	line_num=
+	prefix=UT_001
+	prefix_num=1
+	export file_addDebug=${WORK}/create_UT_AddDebug.txt; echo >$file_addDebug
 	while IFS= read -r line 
 	do
 		[[ "$line" == *.swp ||  "$line" == *.bak ]] && continue
@@ -179,25 +293,31 @@ function Create_UT {
 			file=${file#"b/"*}
 			# file=${file#"application"*}
 			echo
-			echo "<-------------------------------------------------------------------------------------->"
+			# echo "<------>${file}<------>" | tee -a $file_UT
 		elif [[ "$line" == "@@"* ]]; then
-			if [[ -n "$info_func" ]]; then
-				echo $info_func"	$file" | tee -a $file_UT
+			# if [[ -n "$info_func" ]]; then
+				# echo $info_func"	$file" | tee -a $file_UT
 
-			fi
+			# fi
 			info_func=`printf '%s' "${line}" | awk '{for(i=5;i<=NF;++i) print $i}' ` #Don't xargs here
-		else
-			echo $line"	$file" | tee -a $file_UT
+			
+			echo $info_func"	$file" | tee -a $file_UT
 			info_func=
+			# [[ -n $is_addDebug ]] && addDebugComt $file "${line}"
+		else
+			# echo $line"	$file" | tee -a $file_UT
+			echo "--------------->"$line
 		fi 
 	done < $file_diff_tmp
 	if [[ -n "$info_func" ]]; then
 		echo $info_func"	$file" | tee -a $file_UT
+		# [[ -n $is_addDebug ]] && addDebugComt $file "${line}"
 	fi
+	# rm -f $file_addDebug
 	sed -i '$!N; /^\(.*\)\n\1$/!P; D'  ${file_UT} # remove duplicates
 	# sed -i 's/\r//g'  ${file_UT} # remove CR
-	sed -i 's/\//\\/g' ${file_UT} # changing '//' to '\\'
 	sed -i "s/${REPO_PATH_TO_APP}//g" ${file_UT} # remove path to application
+	sed -i 's/\//\\/g' ${file_UT} # changing '//' to '\\'
 	echo 
 	echo branch:$branch
 	showFile $file_diff
@@ -210,13 +330,28 @@ function Create_UT {
 function extract_source {
 	revision_begin=$1
 	revision_end=$2
-	analysis_Revision $revision_begin $revision_end
+	cd ${REPO_PATH}
+	local branch=`git rev-parse --abbrev-ref HEAD`; [[ -z $branch ]] && branch=default
+	des_folder=${WORK}"/extract_source/${REPO_NAME}_${branch}"; mkdir -p $des_folder
+	file_FirstCommit=$des_folder/file_FirstCommit.txt
+	first_commit=`cat $file_FirstCommit`
+	if [[ $revision_begin == all ]]; then
+		if [[ -n $first_commit ]]; then
+			echo OK
+			revision_begin=$first_commit
+			revision_end=
+		else
+			analysis_Revision $revision_begin $revision_end
+			echo $revision_begin > $file_FirstCommit
+		fi
+	else
+		analysis_Revision $revision_begin $revision_end
+	fi
 	
 	echo "------------------- $revision_begin:$revision_end ------------------------"
-	cd ${REPO_PATH}
-	local branch=`git rev-parse --abbrev-ref HEAD`
 	# des_folder=${WORK}"/extract_source/`date +%F_%H%M%S`_${branch}_${revision_begin}_${revision_end}"
-	des_folder=${WORK}"/extract_source/${branch}-${revision_begin}-${revision_end}-`date +%F_%H%M%S`"
+	# mv ${des_folder}-{,.}* ${des_folder} # Moving old extract-sources to backup folder.
+	des_folder=${des_folder}"/${branch}-${revision_begin}-${revision_end}-`date +%F_%H%M%S`"
 	mkdir -p $des_folder
 	rm -rf $des_folder/*
 	file_diff_name_only=$des_folder/file_diff_name_only.txt
@@ -236,10 +371,12 @@ function extract_source {
 	# git diff $revision_begin $revision_end --name-only | 
 	while read line
 	do
+		is_FailCommit=
 		dir_name_file=$(dirname "${line}")
 		mkdir -p $old_folder/$dir_name_file
 		git show ${revision_begin}:$line > $old_folder/$line
 		if [ $? -ne 0 ]; then # If having a error, we will find first commit of this file.
+			is_FailCommit=True
 			first_commit_line=$(git log --diff-filter=A -- ${line} | head -n1 | cut -d ' ' -f2)
 			echo "first_commit_line:${first_commit_line}"
 			rm -f $old_folder/$line
@@ -252,20 +389,33 @@ function extract_source {
 		else
 			cp $line $new_folder/$line
 		fi
+		
+		if [[ "$is_FailCommit" == "True" ]]; then
+			# Checking again
+			`cmp --silent $new_folder/$line $old_folder/$line`
+			if [ $? -eq 0 ]; then
+				# The same, so remove it
+				echo "Both files are the same. Remove them"
+				rm -f $new_folder/$line $old_folder/$line
+			fi
+		fi
 		# cp --parents ${REPO_PATH}/$line $new_folder
-		# cp --parents $ORIGINAL_SOURCE/KM3/KM/application/$line $old_folder
+		# cp --parents $ORIGINAL_SOURCE/KM3/$line $old_folder
 	done < "$file_diff_name_only"
 	# Create_UT $file_diff
 	# tree $old_folder
 	# tree $new_folder
 	# Show tree new_folder
 	echo
-	showFile ${des_folder}
+	# addedLine=`diff -r old new | grep "> " | wc -l`
+	changedLine=`git diff --stat $revision_begin HEAD`
+	changedLine+=" => Actual Changed: "`git diff -w $revision_begin HEAD | grep -c -E "(^[+-]\s*(\/)?\*)|(^[+-]\s*\/\/)"`
 	cd ${des_folder}
 	find ./new | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"
-	addedLine=`diff -r old new | grep "> " | wc -l`
-	echo "Modified line number: ${addedLine}"
-	rm -f ${file_diff_name_only}; rm -f ${file_diff}
+	# find . -maxdepth 2 | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/" # list directories
+	# rm -f ${file_diff_name_only}; rm -f ${file_diff}
+	echo "${changedLine}"
+	showFile ${des_folder}
 
 	cd $CURR_DIR
 	echo "-----------------------------------------------------"
@@ -273,18 +423,18 @@ function extract_source {
 
 function updateSource {
 	echo "-->Updating source..."
-	local fileUpdateSource=${logFolder}/fileUpdateSource-${start_time}.txt
+	local fileUpdateSource=${logFolder}/fileUpdateSource-`date +%F`.txt
 
-	arr_upSource=(mfp divlib/client/Proxy/system divlib/server/Stub)
+	arr_upSource=(mfp divlib/client/Proxy/system divlib/server/Stub divlib/Tool)
 	# arr_upSource=(mfp divlib/client/Proxy/system/ divlib/server/Stub)
 	# arr_upSource=(mfp divlib)
 	case ${ACTION} in
-		divact2) arr_upSource=(divlib/client/Proxy/system/ divlib/server/Stub);;
+		divact2) arr_upSource=(divlib/client/Proxy/system/ divlib/server/Stub divlib/Tool);;
 		mfpact2) arr_upSource=(mfp);;
 		*) ;;
 	esac
-	ops_find='-name "*.h" -o  -name "*.cpp" -o -name Makefile'
-	touch ${fileUpdateSource}
+	ops_find='-name "*.h" -o  -name "*.cpp" -o -name Makefile -name "*.txt"'
+	echo >> ${fileUpdateSource}
 	echo fileUpdateSource:$fileUpdateSource
 	cd ${REPO_PATH}
 	
@@ -297,7 +447,7 @@ function updateSource {
 	
 	for path in ${arr_upSource[*]}
 	do
-		echo *********$path*********
+		echo $path
 		files=`find $path/* -type f ${EXTEN_FILES}`
 		for file in ${files[*]}
 		do
@@ -305,8 +455,9 @@ function updateSource {
 			file_build_sour=$BUILD_SOURCE/$file
 			`cmp --silent $file $file_build_sour`
 			if [ $? -ne 0 ]; then
-				echo $file $file_build_sour | tee -a $fileUpdateSource
+				echo $file_build_sour | tee -a $fileUpdateSource
 				dirname_file_build_sour=$(dirname "${file_build_sour}")
+				# echo "Don't copy $file"
 				mkdir -p $dirname_file_build_sour
 				yes | cp -f $file $file_build_sour
 				touch $file_build_sour
@@ -346,9 +497,23 @@ function compareFolder {
 	rm -r ${cmpFld_second}/$(echo "$second_fld" | cut -d "/" -f2)
 }
 
+function showInfoProcess {
+	local name_proc=${1:-${PMAKE_FILE}}
+	echo "-->showInfoProcess...$name_proc"
+	pro=
+	# echo `ps axf | grep $name_proc | grep -v grep | grep -v buildServer.sh | awk '{print $1}'`
+	for pro in `ps axf | grep -v grep | grep -v ${BASENAME} | grep $name_proc | awk '{print $1}'`
+	do	
+		info=`pwdx $pro`
+		info+=" "`ps -p $pro -o args | tail -n1 | grep --color=always $name_proc`
+		echo $info
+	done
+	echo "-------------------------------------"
+}
+
 function startBuild {
 	echo "-->Build starting..."
-	build_log=$logFolder/build-log-$start_time.txt
+	build_log=$logFolder/build-log-`date +%F`.txt
 	error_log=$logFolder/errors.txt
 	cd ${REPO_PATH}
 	local branch=`git rev-parse --abbrev-ref HEAD`
@@ -356,14 +521,18 @@ function startBuild {
 	cd $CURR_DIR
 	#start build
 	cd $KM/pmake
-	echo "./pmake.sh $MACHINE_TYPE ${ACTION} ${QT_VERSION} e s n 4"
-	$(./pmake.sh $MACHINE_TYPE ${ACTION} ${QT_VERSION} e s n 4 | tee -a $build_log) &
+	echo "./${PMAKE_FILE} $MACHINE_TYPE ${ACTION} ${QT_VERSION} e s n 4"
+	$(./${PMAKE_FILE} $MACHINE_TYPE ${ACTION} ${QT_VERSION} e s n 4 | tee -a $build_log) &
+	PID_PMAKE=`echo $!`
+	echo PID_PMAKE:$PID_PMAKE
 	sleep 5
 	loop=true
 	while [[ -n "$loop" ]]; do
-		id=`ps -ef | grep -v "grep" | grep ./pmake.sh`
+		# id=`ps -ef | grep -v "grep" | grep ./pmake.sh`
+		`ps -ef | grep -v grep | grep -q $PID_PMAKE`
 		if [ $? -ne 0 ]; then
 			loop=""
+			break
 		else
 			curr=`date +%s`
 			let deltatime=curr-start
@@ -383,7 +552,7 @@ function startBuild {
 		sleep 30
 	done
 	printf "Total build time ($MACHINE_TYPE): %d:%02d:%02d\n" $hours $minutes $seconds
-	`egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}`
+	egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}
 	cd $CURR_DIR
 	exit 0
 }
@@ -392,25 +561,35 @@ function startBuild {
 # $2: destination folder
 # $3: list file
 function addMoreFiles {
-	local source="$1"
-	local destination="$2"
-	local file="$3"
-	[[ -z $source || -z $destination ||  -z $file ]] && echo "Failed" && return
+	echo "-->addMoreFiles..."
+	local source=`readlink -f $1`
+	local destination=`readlink -f $2`
+	local file=`readlink -f $3`
+	[[ ! -d $source || ! -d $destination || ! -f $file ]] && echo "Failed" && return
 	cd $source
 	while IFS= read -r line
 	do
 		if [[ -n "$line" ]]; then
-			echo "$line ${destination}/$line"
-			cp --parents $line ${destination}/
+			if [ -f $line ]; then
+				file_build_sour=${destination}/$line
+				dirname_file_build_sour=$(dirname "${file_build_sour}")
+				# echo "Don't copy $file"
+				mkdir -p $dirname_file_build_sour
+				yes | cp -f $line $file_build_sour
+				touch $file_build_sour
+			else
+				echo "File is not exist: $line"
+			fi
 		fi
 	done < $file
 	cd $CURR_DIR
 }
 
-# -all	:	search in application		deafaut:In CommonAPI
-# -sf		:	Show Function Name	default: No
-# -sn		:	Show number line	default: No
-# -sc		:	Show in CommonAPI	default: No
+# -all		:	search in application				deafaut:In CommonAPI
+# -sall		:	Show Function Name, Number line	default: No
+# -sf		:	Show Function Name				default: No
+# -sn		:	Show number line				default: No
+# -sc		:	Show in CommonAPI				default: No
 # -f		: 	Find NameFile in CommonAPI or Not	default: No
 function findInCommonAPI {
 	echo $@
@@ -430,12 +609,17 @@ function findInCommonAPI {
 			pattern=$1
 		elif [[ "$1" == "-sf" ]]; then
 			is_ShowFunc=True
+		elif [[ "$1" == "-sall" ]]; then
+			is_ShowFunc=True
+			is_ShowNumber=True
+			is_ShowCommon=True
 		elif [[ "$1" == "-sn" ]]; then
 			is_ShowNumber=True
 		elif [[ "$1" == "-sc" ]]; then
 			is_ShowCommon=True
 		else
 			pattern=$1
+			[[ $pattern == *.h || $pattern == *.cpp || $pattern == *.c ]] && is_file=True
 		fi	
 		shift
 	done
@@ -470,7 +654,7 @@ function findInCommonAPI {
 			for fld in $fileInCommon
 			do
 				if [ -f $fld ]; then
-					grep -nHi ${pattern} $fld >> $tmp_file
+					grep -naHi ${pattern} $fld >> $tmp_file
 				fi
 			done
 		fi
@@ -485,9 +669,12 @@ function findInCommonAPI {
 				fileName=`echo $line | cut -d ':' -f1`
 				lineNumber=`echo $line | cut -d ':' -f2`
 				content=`echo $line | cut -d ':' -f3-`
+				# ignore if it's a comment.
+				echo $content | grep ^"//" > /dev/null
+				[[ $? -eq 0 ]] && echo isComment:$content && continue
 				if [[ -n ${fileName} && -n ${lineNumber} ]]; then
 					funName=$(getFunNameAtLine ${BUILD_SOURCE}/${fileName} ${lineNumber} "${content}")
-					[[ -z $funName ]] && funName="<global>"
+					[[ -z "$funName" ]] && funName="<global>"
 					if [[ -n $is_ShowCommon ]]; then
 						b_IsCommon=o
 						if [[ -z $InCommon ]]; then
@@ -508,8 +695,10 @@ function findInCommonAPI {
 		else
 			output_file=$tmp_file
 		fi
-		grep --color=always ${pattern} $output_file #show results into the terminal.
+		grep -ai --color=always ${pattern} $output_file #show results into the terminal.
+		# cat $output_file
 		sed -i 's/\r//g'  ${output_file} # remove CR
+		sed -i '/^\s*$/d' $output_file # remove empty line
 		# rm -f $tmp_file
 		showFile $output_file
 		echo Count: `grep -c ${pattern} $output_file `
@@ -522,25 +711,49 @@ function showFile {
 	echo '\\'${SIM_IPaddress}${1} | sed  -e 's/\//\\/g'
 }
 
+function createRepository {
+	echo "-->createRepository..."
+	cd $WORK
+	local fld_source=${1:-${KM}}
+	echo fld_source:$fld_source
+	[ ! -d $fld_source ] && echo "fld_source is not exist" && return
+	local file_listInCommon=`readlink -f listFile_IT6_Eagle.txt`
+	[ ! -f $file_listInCommon ] && echo "file_listInCommon is not exist" && return
+	local path_repo=$REPO_PATH
+	local path_repo_copy=${path_repo}; mkdir -p $path_repo_copy
+	addMoreFiles $fld_source $path_repo_copy $file_listInCommon
+	echo "initial repository..."
+	git init $path_repo
+	cd $path_repo
+	git add ./*; git commit -m "initial"
+	cd $CURR_DIR
+}
+
 function startMFP {
+	local is_server=$1
 	local log_fld=~/work/startMFP
-	mkdir -p ${log_fld}
+	# mkdir -p ${log_fld}
 	mkdir -p ${log_fld}/old
-	mv ${log_fld}/*.txt ${log_fld}/old
+	mv ${log_fld}/*.* ${log_fld}/old
 	local log_file=${log_fld}/log_start-mfp_${start_time}.txt
-	
-	export MYALIASE=F ; source ~/.bashrc
+	showFile $log_file
+	# echo log_file:$log_file
+	# export MYALIASE=F ; source ~/.bashrc
+	export myaliase=F ; source ~/.bashrc
 	cd /root
-	./start-mfp.sh | tee -a ${log_file}
+	./start-mfp.sh $is_server | tee -a ${log_file}
 	
 	# export MYALIASE=TRUE ; source ~/.bashrc
-	# cd ${curr_fld}
+	cd ${CURR_DIR}
 	return
 }
+
+
 
 IS_UpdatedSource=True
 IS_BackupLog=True
 IS_Build=True
+FILE_BRANCH=$logFolder/info_start_build.txt
 ##Getting
 #MACHINE_TYPE
 # result=`ls ${KM_WORK} -l | grep ^d | head -1 | awk '{print $NF}'`
@@ -554,7 +767,7 @@ elif [[ "$1" == "-bl" ]]; then
 elif [[ "$1" == "-us" ]]; then
 	updateSource
 elif [[ "$1" == "-ut" ]]; then
-	Create_UT
+	Create_UT $2
 elif [[ "$1" == "-es" ]]; then
 	extract_source $2 $3
 elif [[ "$1" == "-amf" ]]; then #Added more files
@@ -563,11 +776,19 @@ elif [[ "$1" == "-cmp" ]]; then
 	[[ -z $2 || -z $3 ]] && exit 
 	compareFolder $2 $3 $4
 elif [[ "$1" == "-smfp" ]]; then
-	startMFP
+	startMFP $2
 elif [[ "$1" == "-gf" ]]; then
 	getFunNameAtLine $2 $3
+elif [[ "$1" == "-sf" ]]; then
+	showFile $2
 elif [[ "$1" == "-fcom" ]]; then
 	findInCommonAPI $@
+elif [[ "$1" == "-sp" ]]; then
+	showInfoProcess $2
+elif [[ "$1" == "-cr" ]]; then #Create repository
+	createRepository $2
+elif [[ "$1" == "-kp" ]]; then # Kill other builds in processing
+	killBuildProcess
 else #Start build
 	while [[ -n "$1" ]]; do
 		if [[ "$1" == "-a" ]]; then

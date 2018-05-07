@@ -6,7 +6,9 @@
 #
 #************export*************
 # machine_type=mmlk # zsb2z
-export MACHINE_TYPE=zsze3
+export PMAKE_FILE=pmake.sh
+export GCC='i386-linux-gcc'
+export MACHINE_TYPE=zse800
 export ACTION=act2
 export QT_VERSION=q530
 export MASTER_BRANCH=master
@@ -17,7 +19,8 @@ export KM=$KM3/KM
 export BUILD_SOURCE=${KM}/application
 export KM_WORK=${KM}/work
 export logFolder=$KM/work/${MACHINE_TYPE}/log
-export REPO_NAME=IT6_Dev_1
+#export REPO_NAME=IT6_Dev_1
+export REPO_NAME=IT6_Eagle_0420
 export REPO_PATH=$WORK/git/${REPO_NAME}
 export CSCOPE_DB=cscope.out
 export CSCOPE_EDITOR=vim
@@ -146,7 +149,45 @@ function git_push {
 	echo "git push origin ${branch}:${branch}"
 	git push origin ${branch}:${branch}
 }
-
+function csSource {
+	CURR_DIR=`pwd`
+	arrs=($REPO_PATH $KM)
+	for path in ${arrs[*]}
+	do
+		cd $path/application
+		find mfp/ divlib/ -type f -name *.h -o -name *.cpp -o -name *.c | sort -u > cscope.files; cscope -bv; ctags -R mfp/* divlib/*
+	done
+	cd $CURR_DIR
+}
+function setup_EvnUbuntu {
+echo "->Setup networking..."
+	echo 'auto eth2
+#iface eth2 inet dhcp
+iface eth2 inet static
+address 192.168.106.150' >> /etc/network/interfaces
+/etc/init.d/networking restart
+echo "->Setup LANG..."
+echo 'LANG="en_US.Shift-JIS"
+LANGUAGE="en_US.Shift-JIS"
+LC_CTYPE="en_US.Shift-JIS"
+LC_NUMERIC="en_US.Shift-JIS"
+LC_TIME="en_US.Shift-JIS"
+LC_COLLATE="en_US.Shift-JIS"
+LC_MONETARY="en_US.Shift-JIS"
+LC_MESSAGES="en_US.Shift-JIS"
+LC_PAPER="en_US.Shift-JIS"
+LC_NAME="en_US.Shift-JIS"
+LC_ADDRESS="en_US.Shift-JIS"
+LC_TELEPHONE="en_US.Shift-JIS"
+LC_MEASUREMENT="en_US.Shift-JIS"
+LC_IDENTIFICATION="en_US.Shift-JIS"
+' > /etc/default/locale
+echo 'LANG=en_US
+LANGUAGE=en_US' > vi ~/.pam_environment
+echo "->Instal plugin..."
+dpkg -i ~/.vim/exuberant-ctags_5.9_svn20110310-11_i386.deb
+tar -xvf ~/.vim/cscope-15.8b.tar.gz; cd cscope-15.8b; ./configure; export LDFLAGS="$LDFLAGS -ltinfo"; make; make install; cd ..; rm -rf cscope-15.8b
+}
 
 extract () {
    if [ -f $1 ] ; then
