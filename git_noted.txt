@@ -12,7 +12,12 @@ git tag -a Task_No52_RC_02 -m "Updated as customer's request"
 git tag -d Task_Eagle_RQ_591_RC_01
 
 
-# create new repositoy
+## create new repositoy
+Step 1: Connect to server, create a new, empty directory there and initialize an empty repository.
+> mkdir myrepo.git 
+> cd myrepo.git
+> git --bare init
+
 adduser -m git
 chmod 757 /root
 git init IT5_dev/
@@ -26,5 +31,8 @@ git push -u IT5_dev.git master (noneed)
 # add other public key to authorized_keys
 cat id_rsa.pub >> ~/.ssh/authorized_keys
 
+##Fix errors
 #git-push-error-remote-rejected-master-master-branch
 git config receive.denyCurrentBranch ignore
+#reset head
+git reset --hard fbee9dd 

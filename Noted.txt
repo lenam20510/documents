@@ -7,7 +7,7 @@ fi
 ## Setup on Windows 10
 # Fix virtual box
 cd C:\Program Files\Oracle\VirtualBox	
-VBoxManage.exe -nologo internalcommands sethduuid ”＜重複vdiファイルパス＞”	
+VBoxManage.exe -nologo internalcommands sethduuid 
 # Fix display font japan
 Control Panel\All Control Panel Items\Region
 Administative->Change system locale->select Japan
@@ -24,7 +24,7 @@ cd path/to/repository; sudo chmod 777 -R objects
 ## Setup on Ubuntu 64bit (Ubuntu 16.04.1 LTS newsim64 tty1)
 # Install vboxsf plugin
 CURR_DIR=`pwd`;cd /root/work/;mkdir cdroom;mount /dev/cdrom cdroom;cd cdroom;./VBoxLinuxAdditions.run;cd $CURR_DIR
-mkdir -p /root/work/receive_document ;mount -t vboxsf receive_document /root/work/receive_document 
+destination=receive_document;mkdir -p /root/work/$destination ;mount -t vboxsf $destination /root/work/$destination
 # Config NETWORK
 1. vi /etc/network/interfaces
 auto eth2

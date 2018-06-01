@@ -7,8 +7,8 @@
 #************export*************
 # machine_type=mmlk # zsb2z
 export PMAKE_FILE=pmake.sh
-export GCC='i386-linux-gcc'
-export MACHINE_TYPE=zse800
+export GCC='x86_64-linux-gcc'
+export MACHINE_TYPE=zse800spa
 export ACTION=act2
 export QT_VERSION=q530
 export MASTER_BRANCH=master
@@ -17,10 +17,13 @@ export WORK=/root/work
 export KM3=$WORK/KM3
 export KM=$KM3/KM
 export BUILD_SOURCE=${KM}/application
+export MFP_SOURCE=${BUILD_SOURCE}/mfp
+export DIVLIB_SOURCE=${BUILD_SOURCE}/divlib
 export KM_WORK=${KM}/work
 export logFolder=$KM/work/${MACHINE_TYPE}/log
-#export REPO_NAME=IT6_Dev_1
-export REPO_NAME=IT6_Eagle_0420
+export gccOnlyFiles=${WORK}/gccOnlyFiles
+CURR_REPO=IT6_Sparrow_D0004
+export REPO_NAME=${REPO_NAME:-${CURR_REPO}}
 export REPO_PATH=$WORK/git/${REPO_NAME}
 export CSCOPE_DB=cscope.out
 export CSCOPE_EDITOR=vim
@@ -52,6 +55,11 @@ fi
 #*********Funtion*****************
 #grep with extention *.cpp or/and *.h or anything else
 
+function clearNVRAM {
+	rm -fr /Virtual_NVRAM/*
+	rm -fr /Virtual_SPI-Flash/*
+	yes | mkfs.ext3 /dev/sdc10
+}
 function sgrep {
 	path=
 	options=
@@ -160,6 +168,14 @@ function csSource {
 	cd $CURR_DIR
 }
 function setup_EvnUbuntu {
+echo "->ssh configure..."
+mkdir -p ~/.ssh
+cp ~/.vim/public_key/* ~/.ssh/
+chmod 500 /root/.ssh/id_rsa
+chmod 700 /root/.ssh/id_rsa.pub
+echo "->Git configuring..."
+git config --global user.email "namml@gcs-vn.com"
+git config --global user.name "Le Nam"
 echo "->Setup networking..."
 	echo 'auto eth2
 #iface eth2 inet dhcp

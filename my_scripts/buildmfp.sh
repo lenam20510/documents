@@ -49,7 +49,7 @@ killBuildProcess () {
 	# echo "Safe kill process!!"
 	killHardProcess
 }
-trap killHardProcess SIGINT
+# trap killHardProcess SIGINT
 killHardProcess() {
 	echo "killHardProcess!!!"
 	pids=$(pgrep $BASENAME | grep -v grep | grep -v $PPID)
@@ -78,6 +78,7 @@ function Help() {
 }
 
 function backupLogs {
+	[[ "$IS_MakeFilesMFP" == "True" ]] && return
 	echo "-->BackupLogs..."
 	ls $logFolder/*.log >> /dev/null
 	if [ $? -ne 0 ]; then
@@ -328,11 +329,11 @@ function Create_UT {
 }
 
 function extract_source {
-	revision_begin=$1
+	revision_begin=${1:-all}
 	revision_end=$2
 	cd ${REPO_PATH}
 	local branch=`git rev-parse --abbrev-ref HEAD`; [[ -z $branch ]] && branch=default
-	des_folder=${WORK}"/extract_source/${REPO_NAME}_${branch}"; mkdir -p $des_folder
+	des_folder=${WORK}"/extract_source/${REPO_NAME}/${branch}"; mkdir -p $des_folder
 	file_FirstCommit=$des_folder/file_FirstCommit.txt
 	first_commit=`cat $file_FirstCommit`
 	if [[ $revision_begin == all ]]; then
@@ -351,7 +352,8 @@ function extract_source {
 	echo "------------------- $revision_begin:$revision_end ------------------------"
 	# des_folder=${WORK}"/extract_source/`date +%F_%H%M%S`_${branch}_${revision_begin}_${revision_end}"
 	# mv ${des_folder}-{,.}* ${des_folder} # Moving old extract-sources to backup folder.
-	des_folder=${des_folder}"/${branch}-${revision_begin}-${revision_end}-`date +%F_%H%M%S`"
+	# des_folder=${des_folder}"/${branch}-${revision_begin}-${revision_end}-`date +%F_%H%M%S`"
+	des_folder=${des_folder}"/${revision_begin}-${revision_end}-`date +%F_%H`"
 	mkdir -p $des_folder
 	rm -rf $des_folder/*
 	file_diff_name_only=$des_folder/file_diff_name_only.txt
@@ -409,7 +411,12 @@ function extract_source {
 	echo
 	# addedLine=`diff -r old new | grep "> " | wc -l`
 	changedLine=`git diff --stat $revision_begin HEAD`
-	changedLine+=" => Actual Changed: "`git diff -w $revision_begin HEAD | grep -c -E "(^[+-]\s*(\/)?\*)|(^[+-]\s*\/\/)"`
+	# changedLine+=" => Actual Changed: "`git diff -w $revision_begin HEAD | grep -c -E "(^[+-]\s*(\/)?\*)|(^[+-]\s*\/\/)"`
+	actualChanged=`git diff -w $revision_begin HEAD \
+		| egrep -E "(^[+])" | grep -v -E "(^[+]\s*\/\/)" | grep -v -E "(^[+]\/\*)" | grep -v -E "(^[+]\*\/)"\
+		| grep -v -E "(^[+]\+\+)"`
+	changedLine+=" => Actual Changed: "`echo "$actualChanged" | wc -l`
+	echo "$actualChanged" > $des_folder/actualChanged.txt
 	cd ${des_folder}
 	find ./new | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"
 	# find . -maxdepth 2 | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/" # list directories
@@ -445,6 +452,7 @@ function updateSource {
 		cd application
 	fi
 	
+	[[ "$IS_MakeFilesMFP" == "True" ]] && echo >$listMakeFilesRepo
 	for path in ${arr_upSource[*]}
 	do
 		echo $path
@@ -461,6 +469,8 @@ function updateSource {
 				mkdir -p $dirname_file_build_sour
 				yes | cp -f $file $file_build_sour
 				touch $file_build_sour
+
+				[[ "$IS_MakeFilesMFP" == "True" ]] && echo $file_build_sour >> $listMakeFilesRepo
 			fi
 		done
 	done
@@ -721,6 +731,7 @@ function createRepository {
 	[ ! -f $file_listInCommon ] && echo "file_listInCommon is not exist" && return
 	local path_repo=$REPO_PATH
 	local path_repo_copy=${path_repo}; mkdir -p $path_repo_copy
+	echo path_repo:$path_repo_copy
 	addMoreFiles $fld_source $path_repo_copy $file_listInCommon
 	echo "initial repository..."
 	git init $path_repo
@@ -732,6 +743,8 @@ function createRepository {
 function startMFP {
 	local is_server=$1
 	local log_fld=~/work/startMFP
+	#check the file exist or not
+	[[ ! -f /km/fw/bin/mfp000_allQt || ! -f /km/fw/bin/mfp000_allQt.map ]] && echo "/km/fw/bin/mfp000_allQt* don't exist" && return
 	# mkdir -p ${log_fld}
 	mkdir -p ${log_fld}/old
 	mv ${log_fld}/*.* ${log_fld}/old
@@ -748,11 +761,142 @@ function startMFP {
 	return
 }
 
+function gccCMD {
+	local cmd=$1
+	# echo $cmd
+	$cmd | tee -a $logGCCMake
+}
+
+function makeFilesMFP {
+	echo "-->makeFilesMFP..."
+	local is_client=
+	local is_server=
+	local is_mfp=
+	listFiles=$listMakeFilesMFP
+	if [[ "$IS_UpdatedSource" == "True" ]]; then
+		listFiles=$listMakeFilesRepo
+		[[ -n `cat $listMakeFilesRepo` ]] && cp $listMakeFilesRepo $listMakeFilesMFP
+	fi
+	local is_Build=
+	echo listFiles=$listFiles
+	[ ! -f $listFiles ] && echo "$listFiles is not exist" && exit 0
+	while IFS= read -r line 
+	do
+		[[ ! -n $line ]] && continue
+		echo "line:$line"
+		[[ ! -f $line ]] && echo "error: $line is not exist!!!" && continue
+		path_source=
+		[[ "$line" == *".h" || "$line" != *".cpp" ]] && continue
+		if [[ "$line" == *"application/divlib/client"* ]]; then
+			is_client=True
+			path_source='application/divlib/client'
+		elif [[ "$line" == *"application/divlib/server"* ]]; then
+			is_server=True
+			path_source='application/divlib/server'
+		elif [[ "$line" == *"application/mfp"* ]]; then
+			is_mfp=True
+			path_source='application/mfp'
+		else
+			echo "$line don't support!!!"
+			continue
+		fi
+		fileName=$(basename "${line}")
+		if [[ "$line" != *".cpp" ]]; then
+			echo "$line don't support!!!"
+			continue
+			# fileNameNotExten=`echo $fileName | cut -d '.' -f1`
+			# lineTmp=`find ${KM}/${path_source} -iname ${fileNameNotExten}.cpp | head -n1`
+			# [[ ! -n $lineTmp ]] && echo "Can not find .cpp for $line" && continue
+			# line=$lineTmp
+		fi
+		cmdMakeFile=$(grep -rha --include=*.log ${GCC}.*${path_source}.*${fileName} ${logFolder} | head -n1)
+		cmdMakeFileFull=${cmdMakeFile% *}" $line"
+		if [[ -n $cmdMakeFileFull ]]; then
+			is_Build=True
+			echo "$cmdMakeFileFull"
+			$cmdMakeFileFull 2>&1 $logGCCMake
+		else
+			echo "error: Can't file path for $fileName"
+		fi
+	done < $listFiles
+	[[ ! -n $is_Build ]] && return 0
+	errors=`egrep -in --color=always -e "error:" ${logGCCMake}`
+	if [[ -n $errors ]]; then
+		echo ============================================
+		egrep -in --color=always -e "line:" -e "error:" -e " error " -e " error$" -e "^error " $logGCCMake
+		echo ============================================
+		return 0
+	fi
+	if [[ "$is_client" == "True" ]]; then
+		cmdMake='Creating libdiv_client.so'
+		cmdMakeDivClient=$(grep -rha -A1 --include=*.log "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
+		if [[ -n $cmdMakeDivClient && $cmdMakeDivClient == *libdiv_client.so* ]]; then
+			echo ${cmdMake}...
+			$cmdMakeDivClient 2>&1 $logGCCMake
+		else
+			echo "error: Can't file path for $cmdMake"
+		fi
+		echo "cp libdiv_client.so /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/lib/libdiv_client.so"
+		cp libdiv_client.so /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/lib/libdiv_client.so; rm -f libdiv_client.so
+	fi
+	if [[ "$is_server" == "True" ]]; then
+		cmdMake='Creating libdiv_server.so'
+		cmdMakeDivServer=$(grep -rha -A1 --include=*.log "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
+		if [[ -n $cmdMakeDivServer && $cmdMakeDivServer == *libdiv_server.so* ]]; then
+			echo ${cmdMake}...
+			$cmdMakeDivServer 2>&1 $logGCCMake
+		else
+			echo "error: Can't file path for $cmdMake"
+		fi
+		echo "cp libdiv_server.so /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/lib/libdiv_server.so"
+		cp libdiv_server.so /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/lib/libdiv_server.so; rm -f libdiv_server.so
+	fi
+	if [[ "$is_mfp" == "True" ]]; then
+		cmdMake='Creating mfp000_allQt'
+		cmdMakeMfp000=$(grep -rha -A1 --include=*.txt "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
+		if [[ -n $cmdMakeMfp000 && $cmdMakeMfp000 == *mfp000* ]]; then
+			echo ${cmdMake}...
+			echo "$cmdMakeMfp000"
+			$cmdMakeMfp000 2>&1 $logGCCMake
+			if [ ! -f /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt ]; then
+				echo "error: Mfp make error"
+				return
+			fi
+			[ ! -f /km/fw/bin/mfp000_allQt ] && cp /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt /km/fw/bin/mfp000_allQt
+		else
+			echo "error: Can't file path for $cmdMake"
+		fi
+		cmdMake='Creating mfp000_allQt.map'
+		cmdMakeMfp000=$(grep -rha -A1 --include=*.txt "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
+		if [[ -n $cmdMakeMfp000 && $cmdMakeMfp000 == *mfp000* ]]; then
+			echo ${cmdMake}...
+			echo "$cmdMakeMfp000"
+			cmdMakeMfp000Full=`echo $cmdMakeMfp000 | cut -d '|' -f1`
+			cmdCut=`echo $cmdMakeMfp000 | cut -d '|' -f3- | cut -d '>' -f1`
+			cmdMap=`echo $cmdMakeMfp000 | cut -d '>' -f2-`
+			echo "$cmdMakeMfp000Full | sed -e '/ V /d' -e 's/(.*)//g' -e '/::/d' | $cmdCut > $cmdMap"
+			$cmdMakeMfp000Full | sed -e '/ V /d' -e 's/(.*)//g' -e '/::/d' | $cmdCut > $cmdMap
+			if [ ! -f /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt.map ]; then
+				echo "error: Mfp.map make error"
+				return
+			fi
+			[ ! -f /km/fw/bin/mfp000_allQt.map ] && cp /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt.map /km/fw/bin/mfp000_allQt.map
+		else
+			echo "error: Can't file path for $cmdMake"
+		fi
+	fi
+	echo ============================================
+	egrep -in --color=always -e "line:" -e "error:" -e " error " -e " error$" -e "^error " $logGCCMake
+	echo ============================================
+	exit 0
+}
 
 
 IS_UpdatedSource=True
 IS_BackupLog=True
 IS_Build=True
+IS_MakeFilesMFP=
+IS_MakeFilesDivlib=
 FILE_BRANCH=$logFolder/info_start_build.txt
 ##Getting
 #MACHINE_TYPE
@@ -789,6 +933,8 @@ elif [[ "$1" == "-cr" ]]; then #Create repository
 	createRepository $2
 elif [[ "$1" == "-kp" ]]; then # Kill other builds in processing
 	killBuildProcess
+# elif [[ "$1" == "-mfmfp" ]]; then # make files on MFP
+	# makeFilesMFP | tee -a $logGCCMake
 else #Start build
 	while [[ -n "$1" ]]; do
 		if [[ "$1" == "-a" ]]; then
@@ -802,10 +948,16 @@ else #Start build
 			IS_UpdatedSource=
 		elif [[ "$1" == "-notbl" ]]; then
 			IS_BackupLog=
+		elif [[ "$1" == "-mfmfp" ]]; then # make files on MFP machine.
+			IS_MakeFilesMFP=True
 		fi	
 		shift
 	done	
 	FILE_BRANCH=$logFolder/info_start_build.txt
+	mkdir -p ${gccOnlyFiles}/log
+	listMakeFilesRepo=${gccOnlyFiles}/listMakeFilesRepo.txt; echo >>$listMakeFilesRepo
+	listMakeFilesMFP=${gccOnlyFiles}/listMakeFilesMFP.txt; echo >>$listMakeFilesMFP
+	listMakeFilesDivlib=${gccOnlyFiles}/listMakeFilesDivlib.txt; echo >>$listMakeFilesDivlib
 	echo action: $ACTION
 	echo machine_type: $MACHINE_TYPE
 	echo 
@@ -814,6 +966,12 @@ else #Start build
 	[ $? -ne 0 ] && exit 0
 	[[ "$IS_BackupLog" == "True" ]] && backupLogs
 	[[ "$IS_UpdatedSource" == "True" ]] && updateSource
+	if [[ "$IS_MakeFilesMFP" == "True" ]]; then
+		logGCCMake=${gccOnlyFiles}/log/logGCCMake-`date +%F_%H`.txt; echo > $logGCCMake
+		echo logGCCMake=$logGCCMake
+		makeFilesMFP | tee -a $logGCCMake
+		exit 0
+	fi
 	[[ "$IS_Build" == "True" ]] && startBuild
 	exit 0
 fi

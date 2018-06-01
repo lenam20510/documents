@@ -1,4 +1,4 @@
-# ‾/.bashrc: executed by bash(1) for non-login shells.
+# ~/.bashrc: executed by bash(1) for non-login shells.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
@@ -67,7 +67,7 @@ esac
 
 # enable color support of ls and also add handy aliases
 if [ -x /usr/bin/dircolors ]; then
-    test -r ‾/.dircolors && eval "$(dircolors -b ‾/.dircolors)" || eval "$(dircolors -b)"
+    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
     alias ls='ls --color=auto'
     #alias dir='dir --color=auto'
     #alias vdir='vdir --color=auto'
@@ -82,21 +82,21 @@ alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
 
-[[ -z "$myaliase" ]] && export myaliase=TRUE
 export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/local/pkgconfig
 export LD_LIBRARY_PATH=/km/fw/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib:$LD_LIBRARY_PATH
 
 # Alias definitions.
 # You may want to put all your additions into a separate file like
-# ‾/.bash_aliases, instead of adding them here directly.
+# ~/.bash_aliases, instead of adding them here directly.
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
-
+[[ -z "$myaliase" ]] && export myaliase=TRUE
 if [[ -f /root/.bash_aliases && "$myaliase" == "TRUE" ]]; then
    . /root/.bash_aliases
 fi
-
-#. /root/.bash_aliases
+# if [ -f ~/.bash_aliases ]; then
+    # . ~/.bash_aliases
+# fi
 
 # enable programmable completion features (you don't need to enable
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
