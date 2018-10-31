@@ -1,7 +1,7 @@
 #!/bin/bash
 # clear
-PPID=$$
-echo PPID:$PPID
+# PPID=$$
+# echo PPID:$PPID
 #Default value:
 start=`date +%s`
 start_time=`date +%F_%H%M%S`
@@ -26,6 +26,9 @@ KM3=$ROOT/${MODEL_NAME}/KM3
 KM=$KM3/KM
 KM_APP=$KM/application
 KM_WORK=${KM}/work
+PMAKE_FLD=${KM}/pmake
+export KM_FW=$KM/pmake/${MACHINE_TYPE}/hw/km/fw
+export gccOnlyFiles=${ROOT}/gccOnlyFiles
 # logFolder=`echo ${KM_WORK}/${MACHINE_TYPE}* | cut -d ' ' -f1`/log
 
 # REPO_NAME=${REPO_NAME:-${MODEL_NAME}}
@@ -51,9 +54,10 @@ killBuildProcess () {
 		if [[ $? -ne 0 ]]; then # || `ps -o pid,comm -C $PID_PMAKE | grep -v COMMAND` -ne 0
 			break
 		fi
+		getLengthTime
+		printf "*************************%d:%02d:%02d*****************************\n" $hours $minutes $seconds
 		# echo "${nameProcess} is being used. Please wait..."
 		echo "$pid" | awk '{print $2,$3,$7,$8,$9,$(NF-1),$NF}'
-		echo "--------------------------------------------"
 		# echo "$pid" | grep --color=auto $nameProcess | awk '{print $2,$3,$7,$(NF-1),$NF}'
 		sleep 3
 	done
@@ -74,6 +78,14 @@ killHardProcess() {
 }
 
 SUFFIX="e r n 4"
+
+getLengthTime() {
+	curr=`date +%s`
+	let deltatime=curr-start
+	let hours=deltatime/3600
+	let minutes=(deltatime/60)%60
+	let seconds=deltatime%60
+}
 
 function backupLogs {
 	echo "-->Backuping logs..."
@@ -110,7 +122,7 @@ function updateSource {
 	elif [[ "$subflds" == *"application"* ]]; then
 		cd application
 	fi
-	
+	[[ "$IS_MakeFilesMFP" == "True" ]] && echo >$listMakeFilesRepo
 	for path in ${arr_upSource[*]}
 	do
 		echo $path
@@ -127,6 +139,7 @@ function updateSource {
 				mkdir -p $dirname_file_build_sour
 				yes | cp -f $file $file_build_sour
 				touch $file_build_sour
+				[[ "$IS_MakeFilesMFP" == "True" ]] && echo $file_build_sour >> $listMakeFilesRepo
 			fi
 		done
 	done
@@ -344,15 +357,6 @@ function createRepository {
 	cd $CURR_DIR
 }
 
-runBuild() {
-	echo "cd $KM/pmake"
-	cd $KM/pmake
-	echo "./${PMAKE_FILE} $MACHINE_TYPE ${ACTION} ${QT_VERSION} ${SUFFIX}"
-	$(./${PMAKE_FILE} $MACHINE_TYPE ${ACTION} ${QT_VERSION} ${SUFFIX} | tee -a $build_log) &
-	export PID_PMAKE=`echo $!`
-	echo PID_PMAKE:$PID_PMAKE
-}
-
 function startBuild {
 	# check=`ps -ef | grep pmake.sh | grep -v grep`
 	# [ $? -ne 0 ] && echo "There exists a another progress that is running. Exit!!!" && exit 0
@@ -367,34 +371,32 @@ function startBuild {
 	error_log=$logFolder/errors.txt
 	showFile $build_log
 	#start build
-	# echo "cd $KM/pmake"
-	# cd $KM/pmake
-	# echo "./${PMAKE_FILE} $MACHINE_TYPE ${ACTION} ${QT_VERSION} ${SUFFIX}"
-	# $(./${PMAKE_FILE} $MACHINE_TYPE ${ACTION} ${QT_VERSION} ${SUFFIX} | tee -a $build_log) &
-	# PID_PMAKE=`echo $!`
-	# echo PID_PMAKE:$PID_PMAKE
-	runBuild
+	[ ! -d $KM/pmake ] && echo "pmake folder is not exist. EXIT!!!" && return
+	echo "cd $KM/pmake"
+	cd $KM/pmake
+	echo "./${PMAKE_FILE} $MACHINE_TYPE ${ACTION} ${QT_VERSION} ${SUFFIX}"
+	$(./${PMAKE_FILE} $MACHINE_TYPE ${ACTION} ${QT_VERSION} ${SUFFIX} | tee -a $build_log) &
+	export PID_PMAKE=`echo $!`
+	echo PID_PMAKE:$PID_PMAKE
 	sleep 5
 	loop=true
 	while [[ -n "$loop" ]]; do
-		echo PID_PMAKE:$PID_PMAKE
-		`ps -ef | grep -v grep | grep -q $PMAKE_FILE`
+		# echo PID_PMAKE:$PID_PMAKE
+		# `ps -ef | grep -v grep | grep -q $BASENAME`
+		`ps -ef | grep -v grep | grep -q $PID_PMAKE`
 		if [ $? -ne 0 ]; then
 			loop=""
 			break
 		else
-			curr=`date +%s`
-			let deltatime=curr-start
-			let hours=deltatime/3600
-			let minutes=(deltatime/60)%60
-			let seconds=deltatime%60
+			getLengthTime
 			printf "*************************%d:%02d:%02d*****************************\n" $hours $minutes $seconds
 			# errors=`find $logFolder/*.log | xargs grep --color=auto "error:"`
 			# errors=`egrep -in --color=always -e "error:" -e " error " -e " error$" -e "^error " ${build_log}`
-			errors=`egrep -in --color=auto -e "error:" ${build_log}`
+			errors=`egrep -in --color=always -e "error:" ${build_log}`
 			echo "$errors"
 			if [[ -n "$errors" && "$errors" == *"error:"* ]]; then
-				echo "`grep -n --color=auto "error:" ${build_log}`" > $error_log &
+				# echo "`grep -n --color=auto "error:" ${build_log}`" > $error_log &
+				echo "$errors" > $error_log &
 			fi
 			echo
 		fi
@@ -434,11 +436,162 @@ function setupEnvBuild {
 	cp -rf $fld_Qt ${ARCH_FLD}; cp -rf $fld_Xorg ${ARCH_FLD};
 }
 
+function createROM {
+	ROM_Release=`readlink -f $1`
+	[ ! -d $ROM_Release ] && echo "ROM_Release is not exist. EXIT!!!" && return
+	PMAKE_Mac_Fld=`echo ${PMAKE_FLD}/${MACHINE_TYPE}* | cut -d ' ' -f1`
+	[ ! -d $PMAKE_Mac_Fld ] && echo "PMAKE_Mac_Fld is not exist. EXIT!!!" && return
+	Hw_Release_Fld=$PMAKE_Mac_Fld/hw_release
+	echo "->mv $Hw_Release_Fld/km/* $Hw_Release_Fld"
+	mv $Hw_Release_Fld/km/* $Hw_Release_Fld
+	cd $ROM_Release
+	FW_Release_Fld=`echo FW0* | head -n1 | cut -d ' ' -f1`
+	[ ! -d $FW_Release_Fld ] && echo "FW_Release_Fld is not exist. EXIT!!!" && return
+	echo "->cp -rf $Hw_Release_Fld/* $FW_Release_Fld"
+	cp -rf $Hw_Release_Fld/* $FW_Release_Fld
+	# MKIndex
+	cp ${U4E} .
+	cp ${MKIndex} .
+	mkindex_File=$(basename "${MKIndex}")
+	# mkindex_File=`echo mkindex* | head -n1 | cut -d ' ' -f1`
+	[ ! -f $mkindex_File ] && echo "mkindex_File is not exist. Please copy mkindex_File to $ROM_Release!!!" && return
+	chmod +x $mkindex_File
+	[ ! -f u4e ] && echo "u4e is not exist. EXIT!!!" && return
+	echo "->$mkindex_File $MACHINE_TYPE $FW_Release_Fld e"
+	./$mkindex_File $MACHINE_TYPE $FW_Release_Fld e
+	cd $CURR_DIR
+}
+
+function makeFilesMFP {
+	echo "-->makeFilesMFP..."
+	local is_client=
+	local is_server=
+	local is_mfp=
+	listFiles=$listMakeFilesMFP
+	if [[ "$IS_UpdateSource" == "True" ]]; then
+		listFiles=$listMakeFilesRepo
+		[[ -n `cat $listMakeFilesRepo` ]] && cp $listMakeFilesRepo $listMakeFilesMFP
+	fi
+	local is_Build=
+	echo listFiles=$listFiles
+	[ ! -f $listFiles ] && echo "$listFiles is not exist" && exit 0
+	while IFS= read -r line 
+	do
+		[[ ! -n $line ]] && continue
+		echo "line:$line"
+		[[ ! -f $line ]] && echo "error: $line is not exist!!!" && continue
+		path_source=
+		[[ "$line" == *".h" || "$line" != *".cpp" ]] && continue
+		if [[ "$line" == *"application/divlib/client"* ]]; then
+			is_client=True
+			path_source='application/divlib/client'
+		elif [[ "$line" == *"application/divlib/server"* ]]; then
+			is_server=True
+			path_source='application/divlib/server'
+		elif [[ "$line" == *"application/mfp"* ]]; then
+			is_mfp=True
+			path_source='application/mfp'
+		else
+			echo "$line don't support!!!"
+			continue
+		fi
+		fileName=$(basename "${line}")
+		if [[ "$line" != *".cpp" ]]; then
+			echo "$line don't support!!!"
+			continue
+			# fileNameNotExten=`echo $fileName | cut -d '.' -f1`
+			# lineTmp=`find ${KM}/${path_source} -iname ${fileNameNotExten}.cpp | head -n1`
+			# [[ ! -n $lineTmp ]] && echo "Can not find .cpp for $line" && continue
+			# line=$lineTmp
+		fi
+		cmdMakeFile=$(grep -rha --include=*.log ${GCC}.*${path_source}.*${fileName} ${logFolder} | head -n1)
+		cmdMakeFileFull=${cmdMakeFile% *}" $line"
+		if [[ -n $cmdMakeFileFull ]]; then
+			is_Build=True
+			echo "$cmdMakeFileFull"
+			$cmdMakeFileFull 2>&1 $logGCCMake
+		else
+			echo "error: Can't file path for $fileName"
+		fi
+	done < $listFiles
+	[[ ! -n $is_Build ]] && return 0
+	errors=`egrep -in --color=always -e "error:" ${logGCCMake}`
+	if [[ -n $errors ]]; then
+		echo ============================================
+		egrep -in --color=always -e "line:" -e "error:" -e " error " -e " error$" -e "^error " $logGCCMake
+		echo ============================================
+		return 0
+	fi
+	if [[ "$is_client" == "True" ]]; then
+		cmdMake='Creating libdiv_client.so'
+		cmdMakeDivClient=$(grep -rha -A1 --include=*.log "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
+		if [[ -n $cmdMakeDivClient && $cmdMakeDivClient == *libdiv_client.so* ]]; then
+			echo ${cmdMake}...
+			$cmdMakeDivClient 2>&1 $logGCCMake
+		else
+			echo "error: Can't file path for $cmdMake"
+		fi
+		echo "cp libdiv_client.so $KM_FW/lib/libdiv_client.so"
+		cp libdiv_client.so $KM_FW/lib/libdiv_client.so; rm -f libdiv_client.so
+	fi
+	if [[ "$is_server" == "True" ]]; then
+		cmdMake='Creating libdiv_server.so'
+		cmdMakeDivServer=$(grep -rha -A1 --include=*.log "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
+		if [[ -n $cmdMakeDivServer && $cmdMakeDivServer == *libdiv_server.so* ]]; then
+			echo ${cmdMake}...
+			$cmdMakeDivServer 2>&1 $logGCCMake
+		else
+			echo "error: Can't file path for $cmdMake"
+		fi
+		echo "cp libdiv_server.so $KM_FW/lib/libdiv_server.so"
+		cp libdiv_server.so $KM_FW/lib/libdiv_server.so; rm -f libdiv_server.so
+	fi
+	if [[ "$is_mfp" == "True" ]]; then
+		cmdMake='Creating mfp000_hwQt'
+		cmdMakeMfp000=$(grep -rha -A1 --include=*.log "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
+		if [[ -n $cmdMakeMfp000 && $cmdMakeMfp000 == *mfp000* && $cmdMakeMfp000 == *ljsoncpp ]]; then
+			echo ${cmdMake}...
+			echo "$cmdMakeMfp000"
+			$cmdMakeMfp000 | tee -a $logGCCMake
+			if [ ! -f $KM_FW/bin/mfp000_allQt ]; then
+				echo "error: Mfp make error"
+				return
+			fi
+			# [ ! -f /km/fw/bin/mfp000_allQt ] && echo "cp to /km/fw/bin/mfp000_allQt" && cp /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt /km/fw/bin/mfp000_allQt
+		else
+			echo "error: Can't file path $cmdMake"
+		fi
+		cmdMake='Creating mfp000_hwQt.map'
+		cmdMakeMfp000=$(grep -rha -A1 --include=*.log "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
+		if [[ -n $cmdMakeMfp000 && $cmdMakeMfp000 == *mfp000* ]]; then
+			echo ${cmdMake}...
+			echo "$cmdMakeMfp000"
+			cmdMakeMfp000Full=`echo $cmdMakeMfp000 | cut -d '|' -f1`
+			cmdCut=`echo $cmdMakeMfp000 | cut -d '|' -f3- | cut -d '>' -f1`
+			cmdMap=`echo $cmdMakeMfp000 | cut -d '>' -f2-`
+			echo "$cmdMakeMfp000Full | sed -e '/ V /d' -e 's/(.*)//g' -e '/::/d' | $cmdCut > $cmdMap"
+			$cmdMakeMfp000Full | sed -e '/ V /d' -e 's/(.*)//g' -e '/::/d' | $cmdCut > $cmdMap
+			if [ ! -f $KM_FW/bin/mfp000_allQt.map ]; then
+				echo "error: Mfp.map make error"
+				return
+			fi
+			# [ ! -f /km/fw/bin/mfp000_allQt.map ] && echo "cp to /km/fw/bin/mfp000_allQt.map" && cp /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt.map /km/fw/bin/mfp000_allQt.map
+		else
+			echo "error: Can't file path for $cmdMake"
+		fi
+	fi
+	echo ============================================
+	egrep -in --color=always -e "line:" -e "error:" -e " error " -e " error$" -e "^error " $logGCCMake
+	echo ============================================
+	exit 0
+}
+
 STATUS=True
 IS_setupEnvBuild=
 IS_BuildServer=
 IS_BackupLog=True
 IS_UpdateSource=True
+IS_MakeFilesMFP=
 ##Getting
 #MACHINE_TYPE
 # result=`ls ${KM_WORK} -l | grep ^d | head -1 | awk '{print $NF}'`
@@ -459,6 +612,8 @@ elif [[ "$1" == "-sf" ]]; then
 	showFile $2
 elif [[ "$1" == "-kp" ]]; then # Kill other builds in processing
 	killBuildProcess
+elif [[ "$1" == "-cROM" ]]; then # Creating ROM Release #2 path to ROM
+	createROM $2
 else #Start build
 	while [[ -n "$1" ]]; do
 		if [[ "$1" == "-a" ]]; then
@@ -482,22 +637,40 @@ else #Start build
 			KM_APP=$KM/application
 			KM_WORK=${KM}/work
 			logFolder=`echo ${KM_WORK}/${MACHINE_TYPE}* | cut -d ' ' -f1`/log
+			export KM_FW=$KM/pmake/${MACHINE_TYPE}/hw/km/fw
+			export gccOnlyFiles=${ROOT}/gccOnlyFiles
 		elif [[ "$1" == "-se" ]]; then
 			IS_setupEnvBuild=True
 		elif [[ "$1" == "-sb" ]]; then
 			IS_BuildServer=True
+		elif [[ "$1" == "-mfmfp" ]]; then # make files on MFP machine.
+			IS_MakeFilesMFP=True
 		fi	
 		shift
 	done	
+	mkdir -p ${gccOnlyFiles}/log
+	listMakeFilesRepo=${gccOnlyFiles}/listMakeFilesRepo.txt; echo >>$listMakeFilesRepo
+	listMakeFilesMFP=${gccOnlyFiles}/listMakeFilesMFP.txt; echo >>$listMakeFilesMFP
+	# listMakeFilesDivlib=${gccOnlyFiles}/listMakeFilesDivlib.txt; echo >>$listMakeFilesDivlib
 	echo action: $ACTION
 	echo machine_type: $MACHINE_TYPE
-	echo logFolder: $logFolder
+	echo logFolder: $logFolder; mkdir -p $logFolder
 	echo 
+	#MKIndex
+	arr_MkIndex_IT6=(zse800 zse800zx egl eglz zse800spa zse800spa7 spam spaaiosfp)
+	export MKIndex=${MKINDEX_IT5}
+	[[ " ${arr_MkIndex_IT6[@]} " =~ " ${MACHINE_TYPE} " ]] && export MKIndex=${MKINDEX_IT6}
 	# checking buildmfp.sh was existed or not
 	check=`ps -ef | grep buildServer.sh | grep -v grep`
 	[ $? -ne 0 ] && echo FAILED && exit 0
 	[[ "$IS_UpdateSource" == "True" ]] && updateSource
 	[[ "$IS_setupEnvBuild" == "True" ]] && setupEnvBuild
+	if [[ "$IS_MakeFilesMFP" == "True" ]]; then
+		logGCCMake=${gccOnlyFiles}/log/logGCCMake-`date +%F_%H`.txt; echo > $logGCCMake
+		echo logGCCMake=$logGCCMake
+		makeFilesMFP | tee -a $logGCCMake
+		exit 0
+	fi
 	[[ "$IS_BuildServer" == "True" && "$STATUS" == "True" ]] && startBuild
 	exit 0
 fi

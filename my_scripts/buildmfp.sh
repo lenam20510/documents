@@ -39,9 +39,10 @@ killBuildProcess () {
 		if [[ $? -ne 0 ]]; then # || `ps -o pid,comm -C $PID_PMAKE | grep -v COMMAND` -ne 0
 			break
 		fi
+		getLengthTime
+		printf "*************************%d:%02d:%02d*****************************\n" $hours $minutes $seconds
 		# echo "${nameProcess} is being used. Please wait..."
 		echo "$pid" | awk '{print $2,$3,$7,$8,$9,$(NF-1),$NF}'
-		echo "--------------------------------------------"
 		# echo "$pid" | grep --color=auto $nameProcess | awk '{print $2,$3,$7,$(NF-1),$NF}'
 		sleep 3
 	done
@@ -65,7 +66,7 @@ function Help() {
 	echo "     Copy buildmfp.sh to /root/work folder"
 	echo "        Usage:"
 	echo "              1) ./buildmfp.sh -us"
-	echo "               	Update source code from repository [${REPO_PATH}] to [${BUILD_SOURCE}]"
+	echo "               	Update source code from repository [${REPO_PATH}] to [${KM_APP}]"
 	echo "              2) ./buildmfp.sh -es [First commit] [End commit]"
 	echo "               	Create two new & old folder from repository [${REPO_PATH}]"
 	echo "              3) ./buildmfp.sh [Option]"
@@ -75,6 +76,16 @@ function Help() {
 	echo "                      -notus  :   Do not update source code from repository.  default: Yes"
 	echo "                      -notbl  :   Do not backup log.                          default: Yes"
 	echo "              Ex: ./buildmfp.sh -a mfpact2 -m a64_mv7040 -notus"
+}
+
+SUFFIX="e r n 4"
+
+getLengthTime() {
+	curr=`date +%s`
+	let deltatime=curr-start
+	let hours=deltatime/3600
+	let minutes=(deltatime/60)%60
+	let seconds=deltatime%60
 }
 
 function backupLogs {
@@ -96,6 +107,20 @@ function backupLogs {
 	mv $logFolder/*.log $backupLogFolder
 	mv $logFolder/*.txt $backupLogFolder
 }
+
+
+function checkEnvBuild {
+	local status=True
+	cd ${ARCH_FLD}
+	fld_Qt=`echo qt-everywhere* | cut -d ' ' -f1`;			echo fld_Qt:$fld_Qt
+	fld_Xorg=`echo Xorg* | cut -d ' ' -f1`;					echo fld_Xorg:$fld_Xorg
+	[[ ! -d $fld_Qt || ! -d $fld_Xorg ]] && echo "fld_Qt OR fld_Xorg don't exist" && status=False
+	cd $CURR_DIR
+	[[ ! -d $KM/pmake ]] && echo "pmake folder don't exist." && status=False
+	[[ "$status" == "True" ]] && return 0
+	return 1
+}
+
 
 function analysis_Revision {
 	revision_begin=$1
@@ -331,9 +356,10 @@ function Create_UT {
 function extract_source {
 	revision_begin=${1:-all}
 	revision_end=$2
+	[ ! -d $REPO_PATH ] && echo "Repository is not exist!!!" && return
 	cd ${REPO_PATH}
 	local branch=`git rev-parse --abbrev-ref HEAD`; [[ -z $branch ]] && branch=default
-	des_folder=${WORK}"/extract_source/${REPO_NAME}/${branch}"; mkdir -p $des_folder
+	des_folder=${MY_WORK}"/extract_source/${REPO_NAME}/${branch}"; mkdir -p $des_folder
 	file_FirstCommit=$des_folder/file_FirstCommit.txt
 	first_commit=`cat $file_FirstCommit`
 	if [[ $revision_begin == all ]]; then
@@ -415,7 +441,7 @@ function extract_source {
 	actualChanged=`git diff -w $revision_begin HEAD \
 		| egrep -E "(^[+])" | grep -v -E "(^[+]\s*\/\/)" | grep -v -E "(^[+]\/\*)" | grep -v -E "(^[+]\*\/)"\
 		| grep -v -E "(^[+]\+\+)"`
-	changedLine+=" => Actual Changed: "`echo "$actualChanged" | wc -l`
+	changedLine+=" => Actual Changed: "`echo "$actualChanged" | grep '[^ ]' | wc -l`
 	echo "$actualChanged" > $des_folder/actualChanged.txt
 	cd ${des_folder}
 	find ./new | sed -e "s/[^-][^\/]*\//  |/g" -e "s/|\([^ ]\)/|-\1/"
@@ -431,6 +457,7 @@ function extract_source {
 function updateSource {
 	echo "-->Updating source..."
 	local fileUpdateSource=${logFolder}/fileUpdateSource-`date +%F`.txt
+	[ ! -d $REPO_PATH ] && echo "Repository is not exist!!!" && return
 
 	arr_upSource=(mfp divlib/client/Proxy/system divlib/server/Stub divlib/Tool)
 	# arr_upSource=(mfp divlib/client/Proxy/system/ divlib/server/Stub)
@@ -460,7 +487,7 @@ function updateSource {
 		for file in ${files[*]}
 		do
 			file_name=$(basename "${file}")
-			file_build_sour=$BUILD_SOURCE/$file
+			file_build_sour=$KM_APP/$file
 			`cmp --silent $file $file_build_sour`
 			if [ $? -ne 0 ]; then
 				echo $file_build_sour | tee -a $fileUpdateSource
@@ -509,10 +536,10 @@ function compareFolder {
 
 function showInfoProcess {
 	local name_proc=${1:-${PMAKE_FILE}}
-	echo "-->showInfoProcess...$name_proc"
+	echo "-->showInfoProcess..."
 	pro=
 	# echo `ps axf | grep $name_proc | grep -v grep | grep -v buildServer.sh | awk '{print $1}'`
-	for pro in `ps axf | grep -v grep | grep -v ${BASENAME} | grep $name_proc | awk '{print $1}'`
+	for pro in `ps axf | grep -v grep | grep -v $BASENAME | grep $name_proc | awk '{print $1}'`
 	do	
 		info=`pwdx $pro`
 		info+=" "`ps -p $pro -o args | tail -n1 | grep --color=always $name_proc`
@@ -576,6 +603,7 @@ function addMoreFiles {
 	local destination=`readlink -f $2`
 	local file=`readlink -f $3`
 	[[ ! -d $source || ! -d $destination || ! -f $file ]] && echo "Failed" && return
+	echo >> $file
 	cd $source
 	while IFS= read -r line
 	do
@@ -656,7 +684,7 @@ function findInCommonAPI {
 		OUTPUT=/root/work/findCommonAPI; mkdir -p $OUTPUT
 		tmp_file=${OUTPUT}/${pattern}.txt; echo >$tmp_file
 		output_file=${OUTPUT}/${FILENAME}; echo >$output_file
-		cd ${BUILD_SOURCE}
+		cd ${KM_APP}
 		if [[ -n $is_all ]]; then
 				grep -rna --include=*.h --include=*.cpp --include=*.c --include=MediaMapFile* --exclude=*.bak --exclude=*.class --exclude=*.o --exclude=*.swp ${pattern} * > $tmp_file
 		else
@@ -683,7 +711,7 @@ function findInCommonAPI {
 				echo $content | grep ^"//" > /dev/null
 				[[ $? -eq 0 ]] && echo isComment:$content && continue
 				if [[ -n ${fileName} && -n ${lineNumber} ]]; then
-					funName=$(getFunNameAtLine ${BUILD_SOURCE}/${fileName} ${lineNumber} "${content}")
+					funName=$(getFunNameAtLine ${KM_APP}/${fileName} ${lineNumber} "${content}")
 					[[ -z "$funName" ]] && funName="<global>"
 					if [[ -n $is_ShowCommon ]]; then
 						b_IsCommon=o
@@ -718,7 +746,7 @@ function findInCommonAPI {
 
 function showFile {
 	echo 
-	echo '\\'${SIM_IPaddress}${1} | sed  -e 's/\//\\/g'
+	echo '\\'${IPaddress}${1} | sed  -e 's/\//\\/g'
 }
 
 function createRepository {
@@ -727,7 +755,7 @@ function createRepository {
 	local fld_source=${1:-${KM}}
 	echo fld_source:$fld_source
 	[ ! -d $fld_source ] && echo "fld_source is not exist" && return
-	local file_listInCommon=`readlink -f listFile_IT6_Eagle.txt`
+	local file_listInCommon=`readlink -f ${FILE_REPO}`
 	[ ! -f $file_listInCommon ] && echo "file_listInCommon is not exist" && return
 	local path_repo=$REPO_PATH
 	local path_repo_copy=${path_repo}; mkdir -p $path_repo_copy
@@ -836,8 +864,8 @@ function makeFilesMFP {
 		else
 			echo "error: Can't file path for $cmdMake"
 		fi
-		echo "cp libdiv_client.so /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/lib/libdiv_client.so"
-		cp libdiv_client.so /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/lib/libdiv_client.so; rm -f libdiv_client.so
+		echo "cp libdiv_client.so $KM_FW/lib/libdiv_client.so"
+		cp libdiv_client.so $KM_FW/lib/libdiv_client.so; rm -f libdiv_client.so
 	fi
 	if [[ "$is_server" == "True" ]]; then
 		cmdMake='Creating libdiv_server.so'
@@ -848,26 +876,26 @@ function makeFilesMFP {
 		else
 			echo "error: Can't file path for $cmdMake"
 		fi
-		echo "cp libdiv_server.so /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/lib/libdiv_server.so"
-		cp libdiv_server.so /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/lib/libdiv_server.so; rm -f libdiv_server.so
+		echo "cp libdiv_server.so $KM_FW/lib/libdiv_server.so"
+		cp libdiv_server.so $KM_FW/lib/libdiv_server.so; rm -f libdiv_server.so
 	fi
 	if [[ "$is_mfp" == "True" ]]; then
 		cmdMake='Creating mfp000_allQt'
-		cmdMakeMfp000=$(grep -rha -A1 --include=*.txt "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
-		if [[ -n $cmdMakeMfp000 && $cmdMakeMfp000 == *mfp000* ]]; then
+		cmdMakeMfp000=$(grep -rha -A1 --include=*.log "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
+		if [[ -n $cmdMakeMfp000 && $cmdMakeMfp000 == *mfp000* && $cmdMakeMfp000 == *ljsoncpp ]]; then
 			echo ${cmdMake}...
 			echo "$cmdMakeMfp000"
-			$cmdMakeMfp000 2>&1 $logGCCMake
-			if [ ! -f /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt ]; then
+			$cmdMakeMfp000 | tee -a $logGCCMake
+			if [ ! -f $KM_FW/bin/mfp000_allQt ]; then
 				echo "error: Mfp make error"
 				return
 			fi
-			[ ! -f /km/fw/bin/mfp000_allQt ] && cp /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt /km/fw/bin/mfp000_allQt
+			# [ ! -f /km/fw/bin/mfp000_allQt ] && echo "cp to /km/fw/bin/mfp000_allQt" && cp /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt /km/fw/bin/mfp000_allQt
 		else
-			echo "error: Can't file path for $cmdMake"
+			echo "error: Can't file path $cmdMake"
 		fi
 		cmdMake='Creating mfp000_allQt.map'
-		cmdMakeMfp000=$(grep -rha -A1 --include=*.txt "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
+		cmdMakeMfp000=$(grep -rha -A1 --include=*.log "$cmdMake" ${logFolder} | head -n2 | tail -n1 )
 		if [[ -n $cmdMakeMfp000 && $cmdMakeMfp000 == *mfp000* ]]; then
 			echo ${cmdMake}...
 			echo "$cmdMakeMfp000"
@@ -876,11 +904,11 @@ function makeFilesMFP {
 			cmdMap=`echo $cmdMakeMfp000 | cut -d '>' -f2-`
 			echo "$cmdMakeMfp000Full | sed -e '/ V /d' -e 's/(.*)//g' -e '/::/d' | $cmdCut > $cmdMap"
 			$cmdMakeMfp000Full | sed -e '/ V /d' -e 's/(.*)//g' -e '/::/d' | $cmdCut > $cmdMap
-			if [ ! -f /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt.map ]; then
+			if [ ! -f $KM_FW/bin/mfp000_allQt.map ]; then
 				echo "error: Mfp.map make error"
 				return
 			fi
-			[ ! -f /km/fw/bin/mfp000_allQt.map ] && cp /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt.map /km/fw/bin/mfp000_allQt.map
+			# [ ! -f /km/fw/bin/mfp000_allQt.map ] && echo "cp to /km/fw/bin/mfp000_allQt.map" && cp /root/work/KM3/KM/pmake/${MACHINE_TYPE}/all/km/fw/bin/mfp000_allQt.map /km/fw/bin/mfp000_allQt.map
 		else
 			echo "error: Can't file path for $cmdMake"
 		fi
@@ -957,7 +985,7 @@ else #Start build
 	mkdir -p ${gccOnlyFiles}/log
 	listMakeFilesRepo=${gccOnlyFiles}/listMakeFilesRepo.txt; echo >>$listMakeFilesRepo
 	listMakeFilesMFP=${gccOnlyFiles}/listMakeFilesMFP.txt; echo >>$listMakeFilesMFP
-	listMakeFilesDivlib=${gccOnlyFiles}/listMakeFilesDivlib.txt; echo >>$listMakeFilesDivlib
+	# listMakeFilesDivlib=${gccOnlyFiles}/listMakeFilesDivlib.txt; echo >>$listMakeFilesDivlib
 	echo action: $ACTION
 	echo machine_type: $MACHINE_TYPE
 	echo 

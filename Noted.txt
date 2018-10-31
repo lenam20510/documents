@@ -68,3 +68,7 @@ cd cscope-15.8b
 ./configure; export LDFLAGS="$LDFLAGS -ltinfo"; make; make install
 #go to root dirctory of source
 find mfp/ divlib/ -type f -name *.h -o -name *.cpp -o -name *.c | sort -u > cscope.files; cscope -bv; ctags -R mfp/* divlib/*
+
+#Loi FA014
+File->Virtual Media Manager -> Remove all HDD, SSD related to this Vbosx
+

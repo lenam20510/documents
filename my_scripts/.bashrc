@@ -91,8 +91,8 @@ export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib:$LD_LIBRARY_PATH
 # ~/.bash_aliases, instead of adding them here directly.
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 [[ -z "$myaliase" ]] && export myaliase=TRUE
-if [[ -f /root/.bash_aliases && "$myaliase" == "TRUE" ]]; then
-   . /root/.bash_aliases
+if [[ /root/.bash_aliases && "$myaliase" == "TRUE" ]]; then
+	. /root/.bash_aliases
 fi
 # if [ -f ~/.bash_aliases ]; then
     # . ~/.bash_aliases

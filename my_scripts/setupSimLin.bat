@@ -10,6 +10,10 @@ rem
 rem 更新履歴
 rem 2018/2/22 初版発行
 rem 2018/2/22 仮想マシンの重複チェックの追加
+set FULL_PATH=%~dp0
+set FULL_PATH=%FULL_PATH:~1,-1%
+for %%i in ("%FULL_PATH%") do set "PARENT_FOLDER=%%~ni"
+set ovfname=%PARENT_FOLDER%
 set VIRTUALMACHINE_RAM=4096
 set VIRTUALMACHINE_MAC=080027173B14
 
@@ -24,8 +28,9 @@ set dir2="vdiファイル"
 rem OVFファイルのインポート
 cd .\%dir1%
 for /f "delims=" %%a in ('dir /B ^| findstr ".ovf[^\\]*$"') do @set ovffile=%%a
-for /f "delims=" %%a in ('echo %ovffile%') do @set ovfname=%%a
-for /f %%i in ('echo %ovffile%') do set ovfname=%%~ni
+REM for /f "delims=" %%a in ('echo %ovffile%') do @set ovfname=%%a
+REM for /f %%i in ('echo %ovffile%') do set ovfname=%%~ni
+REM ovfname=%OVFName%
 
 rem 重複チェック
 for /f "tokens=1" %%a in ('VBoxManage list vms') do (
@@ -63,8 +68,14 @@ REM Memory updated
 VBoxManage modifyvm %ovfname% --memory %VIRTUALMACHINE_RAM% --rtcuseutc on --acpi on --nic1 bridged --bridgeadapter1 eth2 --macaddress1 $VIRTUALMACHINE_MAC
 
 rem MACアドレスの更新
-VBoxManage modifyvm %ovfname% --macaddress1 auto
-VBoxManage modifyvm %ovfname% --macaddress2 auto
+VBoxManage modifyvm %ovfname%  --macaddress1 auto hostonly
+VBoxManage modifyvm %ovfname%  --macaddress2 auto hostonly
 
 
 rem ネットワーク設定の変更
+GOTO END
+REM return back to C
+:END
+C:
+ECHO Successful!!!
+PAUSE >NUL

@@ -5,29 +5,57 @@
 #fi
 #
 #************export*************
-# machine_type=mmlk # zsb2z
+#export GCC='x86_64-linux-gcc'
+USER=root
+HOME=/root
+export ARCH_FLD=${HOME}/arch
 export PMAKE_FILE=pmake.sh
-export GCC='x86_64-linux-gcc'
-export MACHINE_TYPE=zse800spa
-export ACTION=act2
-export QT_VERSION=q530
-export MASTER_BRANCH=master
-export SIM_IPaddress='192.168.56.102'
-export WORK=/root/work
-export KM3=$WORK/KM3
+CURR_WORK=/root/work
+CURR_DIR=`pwd`
+export MY_WORK=${CURR_WORK}
+file_config=$HOME/config.ini
+if [ -f config.ini ]; then
+	file_config='config.ini'
+fi
+
+if [ -f $file_config ]; then
+	. $file_config
+else
+	export MACHINE_TYPE=zse800
+	export ACTION=act2
+	export QT_VERSION=q530
+	export MODEL_NAME=Eagle
+	export REPO_NAME=IT6_Eagle_D0010
+	export MASTER_BRANCH=master
+	export IPaddress='192.168.56.102'
+fi
+export file_aliase=${HOME}/.bash_aliases
+#ROOT=`readlink -f $ROOT`
+export MKINDEX_IT6=${CURR_WORK}/mkindex_IT6.sh
+export MKINDEX_IT5=${CURR_WORK}/mkindex_Zeus5BK.sh
+export U4E=${CURR_WORK}/u4e
+export KM3=$CURR_WORK/KM3
 export KM=$KM3/KM
-export BUILD_SOURCE=${KM}/application
-export MFP_SOURCE=${BUILD_SOURCE}/mfp
-export DIVLIB_SOURCE=${BUILD_SOURCE}/divlib
+export KM_APP=${KM}/application
 export KM_WORK=${KM}/work
+export KM_FW=$KM/pmake/${MACHINE_TYPE}/all/km/fw
+export KM_FW_RE=$KM/pmake/${MACHINE_TYPE}/hw_release/km/fw
+export MFP_SOURCE=${KM_APP}/mfp
+export DIVLIB_SOURCE=${KM_APP}/divlib
+export PMAKE_FLD=${KM}/pmake
 export logFolder=$KM/work/${MACHINE_TYPE}/log
-export gccOnlyFiles=${WORK}/gccOnlyFiles
-CURR_REPO=IT6_Sparrow_D0004
-export REPO_NAME=${REPO_NAME:-${CURR_REPO}}
-export REPO_PATH=$WORK/git/${REPO_NAME}
+#export REPO_PATH=$CURR_WORK/git/${REPO_NAME}
+export mountFolder=${CURR_WORK}/mountFolder
+export extractSource=$mountFolder/extractSource
+export REPO_PATH=$mountFolder/git/${REPO_NAME}
+export gccOnlyFiles=${mountFolder}/gccOnlyFiles/${MACHINE_TYPE}-${REPO_NAME}
+export startMFP=${mountFolder}/startMFP/${MACHINE_TYPE}-${REPO_NAME}
+export buildLog=${mountFolder}/build-log/${MACHINE_TYPE}-${REPO_NAME}
+export FILE_REPO=${mountFolder}/listFile_Repository.txt
 export CSCOPE_DB=cscope.out
 export CSCOPE_EDITOR=vim
 
+git config --global core.safecrlf false
 git config --global push.default current
 git config --global color.ui true
 #export GREP_OPTIONS='--color=always'
@@ -55,11 +83,32 @@ fi
 #*********Funtion*****************
 #grep with extention *.cpp or/and *.h or anything else
 
+function mountFld {
+	option=$1
+	if [ -z $option ]; then
+		file=/tmp/mountFld.txt
+		echo "`mount -t vboxsf | grep /media`" > $file; echo >> $file
+		while IFS= read -r line 
+		do
+			[[ ! -n $line ]] && continue
+			destination=`echo $line | awk '{print $1}'`; des_path=$MY_WORK/$destination
+			mkdir -p $des_path; mount -t vboxsf $destination $des_path
+			echo $des_path
+		done < $file
+	else
+		if [[ "$option" == "-i" ]]; then
+			CURR_DIR=`pwd`;cd /root/work/;mkdir cdroom;mount /dev/cdrom cdroom;cd cdroom;echo yes | ./VBoxLinuxAdditions.run;cd $CURR_DIR
+		else
+			des_path=$MY_WORK/$option;mkdir -p $des_path; mount -t vboxsf $option $des_path;echo $des_path
+		fi
+	fi
+}
 function clearNVRAM {
 	rm -fr /Virtual_NVRAM/*
 	rm -fr /Virtual_SPI-Flash/*
 	yes | mkfs.ext3 /dev/sdc10
 }
+
 function sgrep {
 	path=
 	options=
@@ -135,7 +184,7 @@ function rmswapfile {
 			-o -name *.rej \
 			-o -name *.orig \
 			-o -name *.swn "
-	rm -v `find ${BUILD_SOURCE} ${REPO_PATH} -type f ${swapfile}`
+	rm -v `find ${KM_APP} ${REPO_PATH} -type f ${swapfile}`
 }
 function fgtab {
   echo "tput setf/setb - Foreground/Background table"
@@ -167,7 +216,30 @@ function csSource {
 	done
 	cd $CURR_DIR
 }
+function setup_Config {
+	echo "->setup_Config..."
+	cd $PMAKE_FLD
+	machine_type=`ls -d */ | grep -v make | grep -v log | head -n1 | cut -d '/' -f1`
+	echo machine_type:$machine_type
+	repo_name_tmp=`grep echo.*${machine_type} pmake.sh | head -n1`
+	repo_name_tmp=${repo_name_tmp##*${machine_type}}
+	repo_name_tmp=`echo $repo_name_tmp | cut -d ':' -f2 | cut -d '"' -f1 | cut -d ' ' -f1`
+	repo_name_tmp=`echo $repo_name_tmp | sed 's/\\///g'`
+	echo repo_name_tmp:$repo_name_tmp
+	model_name=${repo_name_tmp}; [ $machine_type == *800 ] && model_name=${model_name}Emu800
+
+	[ -n ${machine_type} ] && sed -i 's/MACHINE_TYPE=.*$/'MACHINE_TYPE=${machine_type}'/g' $HOME/config.ini
+	[ -n ${model_name} ] && sed -i 's/MODEL_NAME=.*$/'MODEL_NAME=${model_name}'/g' $HOME/config.ini
+	
+	file_ROMVersion=${MFP_SOURCE}/system/sys/RomVersion/RomVersionIntegration/SYSC_RomVersionInt.h
+	[ -f $file_ROMVersion ] && ROMVersion=`grep TYPD_SysRomversionIntFW $file_ROMVersion | tail -n1 | awk '{print $NF}' | cut -d '"' -f2 | cut -d '(' -f1 | sed s/-//g`
+	
+	repo_name=IT6_${repo_name_tmp}_${ROMVersion}
+	[ -n ${repo_name} ] && sed -i 's/REPO_NAME=.*$/'REPO_NAME=${repo_name}'/g' $HOME/config.ini
+	cd $CURR_DIR
+}
 function setup_EvnUbuntu {
+#echo 'MaxStartups 100' > /etc/ssh/sshd_config
 echo "->ssh configure..."
 mkdir -p ~/.ssh
 cp ~/.vim/public_key/* ~/.ssh/
@@ -176,12 +248,12 @@ chmod 700 /root/.ssh/id_rsa.pub
 echo "->Git configuring..."
 git config --global user.email "namml@gcs-vn.com"
 git config --global user.name "Le Nam"
-echo "->Setup networking..."
-	echo 'auto eth2
+#echo "->Setup networking..."
+	#echo 'auto eth2
 #iface eth2 inet dhcp
-iface eth2 inet static
-address 192.168.106.150' >> /etc/network/interfaces
-/etc/init.d/networking restart
+#iface eth2 inet static
+#address 192.168.106.150' >> /etc/network/interfaces
+#/etc/init.d/networking restart
 echo "->Setup LANG..."
 echo 'LANG="en_US.Shift-JIS"
 LANGUAGE="en_US.Shift-JIS"
@@ -200,9 +272,15 @@ LC_IDENTIFICATION="en_US.Shift-JIS"
 ' > /etc/default/locale
 echo 'LANG=en_US
 LANGUAGE=en_US' > vi ~/.pam_environment
+
+setup_Config
 echo "->Instal plugin..."
 dpkg -i ~/.vim/exuberant-ctags_5.9_svn20110310-11_i386.deb
 tar -xvf ~/.vim/cscope-15.8b.tar.gz; cd cscope-15.8b; ./configure; export LDFLAGS="$LDFLAGS -ltinfo"; make; make install; cd ..; rm -rf cscope-15.8b
+echo "->Install vboxsf..."
+mountFld mountFolder
+[ ! -f $mountFolder/buildmfp.sh ] && `mountFld -i; mountFld mountFolder`
+
 }
 
 extract () {
@@ -229,25 +307,19 @@ extract () {
 
 #***********Alias****************
 # reboot / halt / poweroff
-alias reboot='sudo /sbin/reboot'
-alias poweroff='/root/work/end_mount.sh; sleep 5;sudo /sbin/poweroff'
-alias halt='sudo /sbin/halt'
-alias shutdown='sudo /sbin/shutdown'
 alias ports='netstat -tulanp'
 # This is GOLD for finding out what is taking so much space on your drives!
 alias diskspace="du -S | sort -n -r |more"
 
-alias work='cd /root/work'
-alias appsource='cd ~/work/KM3/KM/application'
+alias work='cd $MY_WORK'
+alias appsource='cd $KM_APP'
+alias appemu800='cd /root/work/Emu800/KM3/KM/application'
 alias apprepo='cd ${REPO_PATH}/application'
-alias nvd_mfp='cd ~/work/KM3/KM/application/mfp/system/nvd'
-alias nvd_divlib='cd ~/work/KM3/KM/application/divlib/client/Proxy/system/nvd'
-alias errors='cat /root/work/KM3/KM/work/${MACHINE_TYPE}/log/errors.txt '
-alias build_mfp='~/work/buildmfp.sh'
-alias start_mount='~/work/start_mount.sh'
-alias end_mount='~/work/end_mount.sh'
+alias nvd_mfp='cd $MFP_SOURCE/system/nvd'
+alias nvd_divlib='cd $DIVLIB_SOURCE/client/Proxy/system/nvd'
+alias errors='cat $buildLog/errors.txt '
+alias build_mfp='$mountFolder/buildmfp.sh'
 alias repo='cd ${REPO_PATH}'
-alias startMFP='cd /root; ./start-mfp.sh | tee -a ~/work/startMFP/log_start-mfp_`date +%F_%H%M%S`.txt'
 alias logFolder='cd $logFolder'
 
 alias mkdir="mkdir -p"
@@ -299,8 +371,10 @@ PURPLE='\e[0;35m'
 SMILEY="${WHITE}:)${NORMAL}"
 DATE="${BLUE}[$(date +%m/%d)]"
 FROWNY="${RED}:(${NORMAL}"
-
-
+#Auto run ad Startup
+mountFld
+[ ! -f $mountFolder/buildmfp.sh ] && mountFld mountFolder
+[ ! -f $REPO_PATH/config.ini ] && cp $file_config $REPO_PATH/config.ini
 #Support git PS1
 [ -f /etc/bash_completion.d/git ] && source /etc/bash_completion.d/git
 [ -f /etc/bash_completion.d/git-prompt ] && source /etc/bash_completion.d/git-prompt
@@ -311,3 +385,4 @@ FROWNY="${RED}:(${NORMAL}"
 SELECT="if [ \$? = 0 ]; then echo \"${SMILEY}\"; else echo \"${FROWNY}\"; fi"
 PS1="\`${SELECT}\` \[${cw}\][\w]\[${csgn}\]\[\033[0m\]\$(__git_ps1)\n${BLUE}->\[${crst}\] "
 
+#PS1="[\w]\\$ "
