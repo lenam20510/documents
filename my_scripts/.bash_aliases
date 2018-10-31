@@ -318,7 +318,7 @@ alias apprepo='cd ${REPO_PATH}/application'
 alias nvd_mfp='cd $MFP_SOURCE/system/nvd'
 alias nvd_divlib='cd $DIVLIB_SOURCE/client/Proxy/system/nvd'
 alias errors='cat $buildLog/errors.txt '
-alias build_mfp='$mountFolder/buildmfp.sh'
+alias build_mfp='$mountFolder/documents/my_scripts/buildmfp.sh'
 alias repo='cd ${REPO_PATH}'
 alias logFolder='cd $logFolder'
 

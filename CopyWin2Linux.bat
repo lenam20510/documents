@@ -1,6 +1,6 @@
 @echo off
 
-set documents=D:\documents
+set documents=D:\mountFolder\documents
 set workspaces=D:\workspaces
 set user=root
 set pass=linuxfum
