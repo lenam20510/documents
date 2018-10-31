@@ -1,0 +1,2 @@
+gcc -Wl,-no-as-needed -Wl,-relax -Wl,--export-dynamic -o /root/work/mountFolder/test/mfp000_allQt -lstdc++ /root/work/mountFolder/test/object/[^_]*/*.o
+nm -nC -g /root/work/mountFolder/test/mfp000_allQt | sed -e '/ V /d' -e 's/(.*)//g' -e '/::/d' | cut -c 1-1023 > /root/work/mountFolder/test/mfp000_allQt.map

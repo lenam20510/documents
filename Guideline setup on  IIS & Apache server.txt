@@ -1,0 +1,128 @@
+I. Install IIS & Create two sites: webmail, payroll
+1. Install IIS
+	1.1 Open up a Powershell command prompt as administrator
+	1.2 Copy and paste the following command into Powershell and hit enter:
+$feats = @("IIS-WebServerRole","IIS-WebServer","IIS-CommonHttpFeatures","IIS-HttpErrors","IIS-Security","IIS-RequestFiltering","IIS-WebServerManagementTools","IIS-DigestAuthentication","IIS-StaticContent","IIS-DefaultDocument","IIS-DirectoryBrowsing","IIS-WebDAV","IIS-BasicAuthentication","IIS-ManagementConsole");foreach ($feat in $feats) {Enable-WindowsOptionalFeature -Online -FeatureName $feat};New-SelfSignedCertificate -DnsName odrive-self-signed -CertStoreLocation cert:\LocalMachine\My;& "$env:windir\system32\inetsrv\InetMgr.exe";
+
+2. Create two sites: webmail, payroll
+2.1. Create two folders called "webmail" and "payroll" in the following folder:
+%SystemDrive%\inetpub\ folder.
+
+2.2 Create two IIS web sites called "webmail" and "payroll" that point to corresponding folders under %SystemDrive%\inetpub\. Use different IP ports for each site.
+	2.1 Set permission in C:\Windows\System32\inetsrv\Config 
+	Remove the check in "Encrypt contents to secure data"
+	2.2 Run following command to created two sites
+	%windir%\System32\inetsrv\appcmd.exe add site /name:"webmail" /bindings:http/*:8081: /physicalPath:"%SystemDrive%\inetpub\webmail
+	%windir%\System32\inetsrv\appcmd.exe add site /name:"payroll" /bindings:http/*:8082: /physicalPath:"%SystemDrive%\inetpub\payroll
+
+II. Configuring Rules for the Reverse Proxy
+	Precondition:
+	a) Install Application Request Routing(ARR) & URL Rewrite
+1. Enabling Reverse Proxy functionality
+	1.1 Open IIS Manager
+	1.2. Select a server node in the tree view on the left hand side and then click on the "Application Request Routing" feature:
+	1.3. Check the "Enable Proxy" check box. Leave the default values for all the other settings on this page:
+2. Creating a rule for webmail application (No need)
+	You will create two rewrite rules:
+	A rewrite rule that will proxy any request to webmail application at http://localhost:8081/ as long as requested URL path starts with "webmail".
+	A rewrite rule that will proxy any request to payroll application at http://localhost:8082/ as long as requested URL path starts with "payroll".
+	Follow steps:
+	Open IIS Manager
+	Sites -> Default Web Site -> URL Rewrite
+		Select Add Rule(s) -> Blank rule
+		Name: Reverse Proxy to webmail
+		Pattern: ^webmail/(.*)
+		Action type: Rewrite
+		Rewrite rule: http://localhost:8081/{R:1}
+	The same input with payroll
+	
+	Under the C:\inetpub\wwwroot\web.config element
+	<?xml version="1.0" encoding="UTF-8"?>
+	<configuration>
+		<system.webServer>
+			<rewrite>
+				<rules>
+					<rule name="Reverse Proxy to payroll">
+						<match url="^payroll/(.*)" />
+						<action type="Rewrite" url="http://localhost:8082/{R:1}" />
+					</rule>
+					<rule name="Proxy Webmail">
+						<match url="^webmail/(.*)" />
+						<action type="Rewrite" url="http://localhost:8081/{R:1}" />
+					</rule>
+				</rules>
+			</rewrite>
+		</system.webServer>
+	</configuration>
+	
+III. Conducted testing
+http://192.168.106.9/payroll/put.txt or http://localhost/payroll/put.txt
+
+Notes:
+Password through will forward password from proxy server to client
+--http-user=USER --http-password=Password will be used for both proxy server and client
+
+**************************IMPORTANT*********************************
+
+## Created WebDAV in IIS server
+Precondition: Install ARR
+	Default Web site -> Add Virtual directory 
+		Alias: WebDAV
+		Physical path: D:\WebDAV (It will map with address localhost:80/WebDAV/)
+	Default Web Site -> Select Authertication on -> Basic Authertication (OFF) and Anonymous Authentication (ON)
+	WebDAV Folder -> Select Authertication on -> Basic Authertication (ON) and Anonymous Authentication (OFF)
+
+
+##Setup Proxy in Apache
+Install: apache_2.2.9-win32-x86-openssl-0.9.8h-r2.msi
+
+1. Create a password/group file
+	htpasswd -c C:\Apache2.2\password.file namml
+	C:\Apache2.2\group.file (usergroup: namml)
+2. Modify C:\Apache2.2\conf\httpd.conf
+	Uncomment the following LoadModule directives to enable proxy funcionality
+		LoadModule proxy_module modules/mod_proxy.so
+		LoadModule proxy_http_module modules/mod_proxy_http.so
+	Add the following directives to the C:\Apache2.2\conf\http.conf to enable authentication
+		ProxyRequests On
+		ProxyVia On
+
+		<Proxy *>
+				Order deny,allow
+				Allow from all
+				Authtype Basic
+				Authname "Password Required"
+				AuthUserFile C:\Apache2.2\password.file
+				AuthGroupFile C:\Apache2.2\group.file
+				Require group usergroup
+				#Require valid-user
+		</Proxy>
+
+		ProxyPass        /WebDAV http://localhost:8083/WebDAV/
+		ProxyPassReverse /WebDAV http://localhost:8083/WebDAV/
+		
+	Reference: https://stackoverflow.com/questions/724599/setting-up-an-apache-proxy-with-authentication
+	
+##Configuring Apache to run SSL/HTTPS server:
+	Reference: http://rubayathasan.com/tutorial/apache-ssl-on-windows/
+
+##Configuring IIS to run SSL/HTTPS server:
+Precondition: Install Certificate sever for IIS
+1. Create a server certificates
+	IIS -> Server Certificates -> Create Self-Signed Certificates 
+		Friendly name for Certificate: 192.168.106.9
+		certificates store: Web hosting
+2. Create HTTPS on Default Web Site
+	Right click -> Edit Biding -> Add
+		Type: https
+		Port: 443
+		SSL certificates: Select above certificated (192.168.106.9)
+3. Setting on WebDAV in Default Web sites
+	Select WebDAV folder -> SSL Setting
+		check "Require SSL"
+		Client certificates: Accept
+Reference: https://www.digicert.com/csr-creation-ssl-installation-iis-10.htm
+		
+##Verify Max size file on WebDAV server:
+	Select WebDAV folder -> Request Filtering -> Edit Feature Setting
+

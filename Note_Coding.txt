@@ -1,0 +1,10 @@
+**Send an receive on 253***
+Server: \\192.168.106.253\04_sim_source_rom
+Acount t?m th?i: hemfp_user/gcsvn123
+Em check thong tin ? Sheet Receieved List, No.637 trong file Send and Reveice.
+\\192.168.106.167\11_ProjectManagement\isms
+ƒhƒLƒ…ƒƒ“ƒgŠÇ—•ë_Send_and_Receive_Management.xlsx
+
+## Build on server 251 ***
+192.168.106.251
+hemfpadmin/GCSvn123
